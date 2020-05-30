@@ -6,6 +6,7 @@ use std::ptr;
 
 use log::{error, info};
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
+use thiserror::Error;
 use winapi::{
     shared::minwindef::{BOOL, DWORD, HINSTANCE, LPVOID, TRUE},
     um::{
@@ -39,6 +40,72 @@ fn idle() {
     let _ = io::stdin().read_exact(&mut sentinel);
 }
 
+unsafe fn dump() {
+    match Module::from("BorderlandsPreSequel.exe") {
+        Ok(game) => {
+            info!("{:#x?}", game);
+            
+            let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
+
+            if let Some(global_objects) = game.find_pattern(&pattern) {
+                let global_objects = (global_objects + 2) as *const *const Objects;
+                let global_objects = global_objects.read_unaligned();
+                GLOBAL_OBJECTS = global_objects;
+
+                let pattern = [
+                    Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
+                    None, None, None, None,
+                ];
+
+                if let Some(global_names) = game.find_pattern(&pattern) {
+                    let global_names = (global_names + 8) as *const *const Names;
+                    let global_names = global_names.read_unaligned();
+                    GLOBAL_NAMES = global_names;
+
+                    if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
+                        info!("Dumping to {}", OBJECTS);
+
+                        for &object in (*global_objects).iter() {
+                            if object.is_null() {
+                                continue;
+                            }
+    
+                            let address = object as usize;
+                            let object = &*object;
+                            
+                            if let Some(name) = object.full_name() {
+                                let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
+                            }
+                        }
+
+                        if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
+                            info!("Dumping to {}", NAMES);
+
+                            for (i, &name) in (*global_names).iter().enumerate() {
+                                if name.is_null() {
+                                    continue;
+                                }
+                                
+                                let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
+                            }
+                        } else {
+                            error!("Unable to create {}", NAMES);
+                        }
+                    } else {
+                        error!("Unable to create {}", OBJECTS);
+                    }
+                } else {
+                    error!("Unable to find global names.");
+                }
+            } else {
+                error!("Unable to find global objects.");
+            }
+        }
+
+        Err(e) => error!("{}", e)
+    }
+}
+
 unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
     AllocConsole();
     println!("Allocated console.");
@@ -47,70 +114,7 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
         eprintln!("Failed to initialize logger: {}", e);
     } else {
         info!("Initialized logger.");
-
-        match Module::from("BorderlandsPreSequel.exe") {
-            Ok(game) => {
-                info!("{:#x?}", game);
-                
-                let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
-
-                if let Some(global_objects) = game.find_pattern(&pattern) {
-                    let global_objects = (global_objects + 2) as *const *const Objects;
-                    let global_objects = global_objects.read_unaligned();
-                    GLOBAL_OBJECTS = global_objects;
-
-                    let pattern = [
-                        Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
-                        None, None, None, None,
-                    ];
-
-                    if let Some(global_names) = game.find_pattern(&pattern) {
-                        let global_names = (global_names + 8) as *const *const Names;
-                        let global_names = global_names.read_unaligned();
-                        GLOBAL_NAMES = global_names;
-
-                        if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
-                            info!("Dumping to {}", OBJECTS);
-
-                            for &object in (*global_objects).iter() {
-                                if object.is_null() {
-                                    continue;
-                                }
-        
-                                let address = object as usize;
-                                let object = &*object;
-                                
-                                if let Some(name) = object.full_name() {
-                                    let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
-                                }
-                            }
-
-                            if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
-                                info!("Dumping to {}", NAMES);
-
-                                for (i, &name) in (*global_names).iter().enumerate() {
-                                    if name.is_null() {
-                                        continue;
-                                    }
-                                    
-                                    let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
-                                }
-                            } else {
-                                error!("Unable to create {}", NAMES);
-                            }
-                        } else {
-                            error!("Unable to create {}", OBJECTS);
-                        }
-                    } else {
-                        error!("Unable to find global names.");
-                    }
-                } else {
-                    error!("Unable to find global objects.");
-                }
-            }
-
-            Err(e) => error!("{}", e)
-        }
+        dump();
     }
 
     idle();
