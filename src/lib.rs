@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::ptr;
 
 use log::{error, info};
-use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
+use simplelog::{Config, LevelFilter, TerminalMode, TermLogger};
 use thiserror::Error;
 use winapi::{
     shared::minwindef::{BOOL, DWORD, HINSTANCE, LPVOID, TRUE},
@@ -18,19 +18,18 @@ use winapi::{
     },
 };
 
-
 mod dump;
 
 mod game;
-use game::{Objects, Names};
+use game::{Names, Objects};
 
 mod macros;
 
 mod module;
 use module::Module;
 
-pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
+pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 
 fn idle() {
     println!("Idling. Press enter to continue.");
@@ -40,29 +39,22 @@ fn idle() {
 
 #[derive(Error, Debug)]
 enum Error {
+    #[error("dump error: {0}")]
+    Dump(#[from] dump::Error),
+
     #[error("{0}")]
     Module(#[from] module::Error),
-
-    #[error("cannot find global objects")]
-    ObjectsNotFound,
 
     #[error("cannot find global names")]
     NamesNotFound,
 
-    #[error("dump error: {0}")]
-    Dump(#[from] dump::Error),
+    #[error("cannot find global objects")]
+    ObjectsNotFound,
 }
 
 unsafe fn find_globals() -> Result<(), Error> {
     let game = Module::from("BorderlandsPreSequel.exe")?;
     
-    let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
-
-    let global_objects = game.find_pattern(&pattern).ok_or(Error::ObjectsNotFound)?;
-    let global_objects = (global_objects + 2) as *const *const Objects;
-    let global_objects = global_objects.read_unaligned();
-    GLOBAL_OBJECTS = global_objects;
-
     let pattern = [
         Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
         None, None, None, None,
@@ -73,14 +65,20 @@ unsafe fn find_globals() -> Result<(), Error> {
     let global_names = global_names.read_unaligned();
     GLOBAL_NAMES = global_names;
 
+    let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
+
+    let global_objects = game.find_pattern(&pattern).ok_or(Error::ObjectsNotFound)?;
+    let global_objects = (global_objects + 2) as *const *const Objects;
+    let global_objects = global_objects.read_unaligned();
+    GLOBAL_OBJECTS = global_objects;
+
     Ok(())
 }
 
-
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    dump::objects()?;
     dump::names()?;
+    dump::objects()?;
     Ok(())
 }
 
