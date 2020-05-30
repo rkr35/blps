@@ -1,0 +1,62 @@
+66 0F EF C0 66 0F D6 05 64 81 8C 01
+66 0F EF C0 66 0F D6 05 ?? ?? ?? ??
+
+004459F0 | F605 94A38C01 01         | test byte ptr ds:[18CA394],1            |
+004459F7 | 75 11                    | jne borderlandspresequel.445A0A         |
+004459F9 | 830D 94A38C01 01         | or dword ptr ds:[18CA394],1             |
+00445A00 | B9 90A38C01              | mov ecx,borderlandspresequel.18CA390    |
+00445A05 | E8 F661FFFF              | call borderlandspresequel.43BC00        |
+00445A0A | 53                       | push ebx                                |
+00445A0B | 56                       | push esi                                |
+00445A0C | 57                       | push edi                                |
+00445A0D | E8 2E5AFCFF              | call borderlandspresequel.40B440        |
+00445A12 | C700 01000000            | mov dword ptr ds:[eax],1                |
+00445A18 | 33C0                     | xor eax,eax                             |
+00445A1A | B9 00000100              | mov ecx,10000                           |
+00445A1F | BF B0FF8701              | mov edi,borderlandspresequel.187FFB0    |
+00445A24 | F3:AB                    | rep stosd                               |
+00445A26 | A1 74818C01              | mov eax,dword ptr ds:[18C8174]          |
+00445A2B | 2B05 70818C01            | sub eax,dword ptr ds:[18C8170]          |
+00445A31 | 33F6                     | xor esi,esi                             |
+00445A33 | BF 15000000              | mov edi,15                              |
+00445A38 | 66:0FEFC0                | pxor xmm0,xmm0                          |
+00445A3C | 66:0FD605 64818C01       | movq qword ptr ds:[18C8164],xmm0        |
+00445A44 | 8935 6C818C01            | mov dword ptr ds:[18C816C],esi          |
+00445A4A | 3BC7                     | cmp eax,edi                             |
+00445A4C | 7D 0A                    | jge borderlandspresequel.445A58         |
+00445A4E | B9 70818C01              | mov ecx,borderlandspresequel.18C8170    |
+00445A53 | E8 9862FFFF              | call borderlandspresequel.43BCF0        |
+00445A58 | A1 70818C01              | mov eax,dword ptr ds:[18C8170]          |
+00445A5D | 013D 78818C01            | add dword ptr ds:[18C8178],edi          |
+00445A63 | 013D A8FF8701            | add dword ptr ds:[187FFA8],edi          |
+00445A69 | 8BD8                     | mov ebx,eax                             |
+00445A6B | 68 502F5001              | push borderlandspresequel.1502F50       | 1502F50:"None"
+00445A70 | 03C7                     | add eax,edi                             |
+00445A72 | 8B3D ECA34B01            | mov edi,dword ptr ds:[<&strcpy_s>]      |
+00445A78 | A3 70818C01              | mov dword ptr ds:[18C8170],eax          |
+00445A7D | 8D4B 10                  | lea ecx,dword ptr ds:[ebx+10]           |
+00445A80 | 6A 05                    | push 5                                  |
+00445A82 | 51                       | push ecx                                |
+00445A83 | 8933                     | mov dword ptr ds:[ebx],esi              |
+00445A85 | 8973 04                  | mov dword ptr ds:[ebx+4],esi            |
+00445A88 | 8973 08                  | mov dword ptr ds:[ebx+8],esi            |
+00445A8B | 8973 0C                  | mov dword ptr ds:[ebx+C],esi            |
+00445A8E | FFD7                     | call edi                                |
+00445A90 | FF05 A4FF8701            | inc dword ptr ds:[187FFA4]              |
+00445A96 | 53                       | push ebx                                |
+00445A97 | E8 A4FBFFFF              | call borderlandspresequel.445640        |
+00445A9C | 8B15 74818C01            | mov edx,dword ptr ds:[18C8174]          |
+00445AA2 | 2B15 70818C01            | sub edx,dword ptr ds:[18C8170]          |
+00445AA8 | 83C4 10                  | add esp,10                              |
+00445AAB | 83FA 1D                  | cmp edx,1D                              |
+00445AAE | 7D 0A                    | jge borderlandspresequel.445ABA         |
+00445AB0 | B9 70818C01              | mov ecx,borderlandspresequel.18C8170    |
+00445AB5 | E8 3662FFFF              | call borderlandspresequel.43BCF0        |
+00445ABA | A1 70818C01              | mov eax,dword ptr ds:[18C8170]          |
+00445ABF | 8BD8                     | mov ebx,eax                             |
+00445AC1 | B9 1D000000              | mov ecx,1D                              |
+00445AC6 | 010D 78818C01            | add dword ptr ds:[18C8178],ecx          |
+00445ACC | 010D A8FF8701            | add dword ptr ds:[187FFA8],ecx          |
+00445AD2 | 03C1                     | add eax,ecx                             |
+00445AD4 | A3 70818C01              | mov dword ptr ds:[18C8170],eax          |
+00445AD9 | 68 402F5001              | push borderlandspresequel.1502F40       | 1502F40:"ByteProperty"

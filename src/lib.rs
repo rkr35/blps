@@ -1,6 +1,7 @@
 #![warn(clippy::pedantic)]
 
 use std::io::{self, Read};
+use std::os::raw::c_char;
 use std::ptr;
 
 use log::{error, info};
@@ -30,6 +31,12 @@ pub struct Array<T> {
 
 #[repr(C)]
 pub struct Name {
+    pad0: [u8; 0x10],
+    text: c_char,
+}
+
+#[repr(C)]
+pub struct NameIndex {
     index: u32,
     number: u32,
 }
@@ -41,7 +48,7 @@ pub struct Object {
     index: u32,
     pad1: [u8; 0x4],
     pub outer: *mut Object,
-    name: Name,
+    name: NameIndex,
     class: *mut Struct,
     pad2: [u8; 0x4],
 }
@@ -63,9 +70,17 @@ pub struct Struct {
 }
 
 pub type Objects = Array<*mut Object>;
+pub type Names = Array<*const Name>;
 
 pub const GLOBAL_OBJECTS: [Option<u8>; 9] = [
-    Some(0x8B),  Some(0x0D),  None,  None,  None,  None,  Some(0x8B),  Some(0x34),  Some(0xB9)
+    Some(0x8B), Some(0x0D),
+    None, None, None, None, 
+    Some(0x8B), Some(0x34), Some(0xB9),
+];
+
+pub const GLOBAL_NAMES: [Option<u8>; 12] = [
+    Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
+    None, None, None, None,
 ];
 
 fn idle() {
@@ -89,15 +104,23 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
                 
                 // Find global objects.
                 if let Some(global_objects) = game.find_pattern(&GLOBAL_OBJECTS) {
-                    let global_objects = (global_objects + 2) as *const *mut Objects;
+                    let global_objects = (global_objects + 2) as *const *const Objects;
                     let global_objects = global_objects.read_unaligned();
                     let global_objects = &*global_objects;
 
                     info!("global_objects = {:?}, {}, {}", global_objects.data, global_objects.count, global_objects.max);
 
-                    // Find global names.
+                    if let Some(global_names) = game.find_pattern(&GLOBAL_NAMES) {
+                        // Find global names.
+                        let global_names = (global_names + 8) as *const *const Names;
+                        let global_names = global_names.read_unaligned();
+                        let global_names = &*global_names;
+    
+                        info!("global_names = {:?}, {}, {}", global_names.data, global_names.count, global_names.max);
 
-
+                    } else {
+                        error!("Unable to find global names.");
+                    }
                 } else {
                     error!("Unable to find global objects.");
                 }
