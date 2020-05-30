@@ -13,6 +13,9 @@ use winapi::{
     },
 };
 
+mod macros;
+mod module;
+
 macro_rules! msg_box {
     ($text:literal, $caption:literal) => {
         let text = w!($text);
