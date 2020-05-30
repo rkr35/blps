@@ -50,6 +50,9 @@ enum Error {
 
     #[error("cannot find global names")]
     NamesNotFound,
+
+    #[error("dump io error: {0}")]
+    DumpIoError(#[from] io::Error),
 }
 
 unsafe fn dump() -> Result<(), Error> {
@@ -74,37 +77,33 @@ unsafe fn dump() -> Result<(), Error> {
     let global_names = global_names.read_unaligned();
     GLOBAL_NAMES = global_names;
 
-    if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
-        info!("Dumping to {}", OBJECTS);
+    let mut objects_dump = File::create(OBJECTS).map(BufWriter::new)?;
 
-        for &object in (*global_objects).iter() {
-            if object.is_null() {
-                continue;
-            }
+    info!("Dumping to {}", OBJECTS);
 
-            let address = object as usize;
-            let object = &*object;
-            
-            if let Some(name) = object.full_name() {
-                let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
-            }
+    for &object in (*global_objects).iter() {
+        if object.is_null() {
+            continue;
         }
 
-        if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
-            info!("Dumping to {}", NAMES);
-
-            for (i, &name) in (*global_names).iter().enumerate() {
-                if name.is_null() {
-                    continue;
-                }
-                
-                let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
-            }
-        } else {
-            error!("Unable to create {}", NAMES);
+        let address = object as usize;
+        let object = &*object;
+        
+        if let Some(name) = object.full_name() {
+            writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address)?;
         }
-    } else {
-        error!("Unable to create {}", OBJECTS);
+    }
+
+    let mut names_dump = File::create(NAMES).map(BufWriter::new)?;
+
+    info!("Dumping to {}", NAMES);
+
+    for (i, &name) in (*global_names).iter().enumerate() {
+        if name.is_null() {
+            continue;
+        }
+        
+        writeln!(&mut names_dump, "[{}] {}", i, (*name).text())?;
     }
 
     Ok(())
