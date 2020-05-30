@@ -62,6 +62,8 @@ pub struct Struct {
     pad1: [u8; 0x3a],
 }
 
+pub type Objects = Array<*mut Object>;
+
 pub const GLOBAL_OBJECTS: [Option<u8>; 9] = [
     Some(0x8B),  Some(0x0D),  None,  None,  None,  None,  Some(0x8B),  Some(0x34),  Some(0xB9)
 ];
@@ -87,7 +89,7 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
                 
                 // Find global objects.
                 if let Some(global_objects) = game.find_pattern(&GLOBAL_OBJECTS) {
-                    let global_objects = (global_objects + 2) as *const *const Array<Object>;
+                    let global_objects = (global_objects + 2) as *const *mut Objects;
                     let global_objects = global_objects.read_unaligned();
                     let global_objects = &*global_objects;
 
