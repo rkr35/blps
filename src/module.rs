@@ -74,10 +74,6 @@ impl Module {
         Ok(module)
     }
 
-    pub unsafe fn get_proc_address(&self, proc: &[u8]) -> Option<usize> {
-        get_proc_address(self.module, proc)
-    }
-
     fn get_handle(name: &str) -> Result<HMODULE, Error> {
         let handle = unsafe {
             let wide_name = wide_format!("{}", name);
@@ -134,15 +130,5 @@ impl Module {
                     .zip(window.iter())
                     .all(|(pattern_byte, module_byte)| pattern_byte.map_or(true, |p| p == *module_byte)))
             .map(|window| window.as_ptr() as usize)
-    }
-}
-
-unsafe fn get_proc_address(module: HMODULE, proc: &[u8]) -> Option<usize> {
-    let pointer = GetProcAddress(module, proc.as_ptr().cast());
-
-    if pointer.is_null() {
-        None
-    } else {
-        Some(pointer as usize)
     }
 }
