@@ -17,9 +17,6 @@ pub enum ErrorKind<'a> {
 
     #[error("failed to query module information")]
     GetModuleInformation,
-
-    #[error("failed to convert the Rust string \"{0}\" to a C string because it contains an interior null byte at index {1}")]
-    StrConversion(&'a str, usize),
 }
 
 #[derive(Error, Debug)]
