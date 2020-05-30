@@ -113,7 +113,7 @@ impl Module {
     }
 
     pub fn _find_string(&self, string: &str) -> Option<*const u8> {
-        self.find_bytes(string.as_bytes())
+        self._find_bytes(string.as_bytes())
     }
 
     pub fn _find_pattern(&self, pattern: &[Option<u8>]) -> Option<usize> {
