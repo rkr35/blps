@@ -1,0 +1,32 @@
+8B 0D 40 A5 90 01 8B 34 B9
+8B 0D ?? ?? ?? ?? 8B 34 B9
+
+00481184                     | 68 A87E5001                             | push borderlandspresequel.1507EA8                      | 1507EA8:L"Dependencies of %s:"
+00481189                     | E8 8206FCFF                             | call borderlandspresequel.441810                       |
+0048118E                     | 8D8D FCEDFFFF                           | lea ecx,dword ptr ss:[ebp-1204]                        |
+00481194                     | C645 FC 3A                              | mov byte ptr ss:[ebp-4],3A                             | 3A:':'
+00481198                     | E8 B3718400                             | call borderlandspresequel.CC8350                       |
+0048119D                     | 8B95 ACEEFFFF                           | mov edx,dword ptr ss:[ebp-1154]                        | [ebp-1154]:L"C:\\Windows\\SYSTEM32\\combase.dll"
+004811A3                     | 8D8D 38EEFFFF                           | lea ecx,dword ptr ss:[ebp-11C8]                        |
+004811A9                     | 51                                      | push ecx                                               |
+004811AA                     | 68 987E5001                             | push borderlandspresequel.1507E98                      | 1507E98:L"RECURSE"
+004811AF                     | 52                                      | push edx                                               |
+004811B0                     | C785 38EEFFFF 00000000                  | mov dword ptr ss:[ebp-11C8],0                          |
+004811BA                     | E8 A1A3FBFF                             | call borderlandspresequel.43B560                       |
+004811BF                     | 83C4 0C                                 | add esp,C                                              |
+004811C2                     | 8985 A0EEFFFF                           | mov dword ptr ss:[ebp-1160],eax                        |
+004811C8                     | A1 10A59001                             | mov eax,dword ptr ds:[190A510]                         |
+004811CD                     | 6A 00                                   | push 0                                                 |
+004811CF                     | 50                                      | push eax                                               |
+004811D0                     | 8D8D 48EEFFFF                           | lea ecx,dword ptr ss:[ebp-11B8]                        |
+004811D6                     | E8 C57AF5FF                             | call borderlandspresequel.3D8CA0                       |
+004811DB                     | EB 03                                   | jmp borderlandspresequel.4811E0                        |
+004811DD                     | 8D49 00                                 | lea ecx,dword ptr ds:[ecx]                             |
+004811E0                     | 8BBD 4CEEFFFF                           | mov edi,dword ptr ss:[ebp-11B4]                        |
+004811E6                     | 85FF                                    | test edi,edi                                           |
+004811E8                     | 0F88 C5000000                           | js borderlandspresequel.4812B3                         |
+004811EE                     | 3B3D 44A59001                           | cmp edi,dword ptr ds:[190A544]                         |
+004811F4                     | 0F8D B9000000                           | jge borderlandspresequel.4812B3                        |
+004811FA                     | 8B0D 40A59001                           | mov ecx,dword ptr ds:[190A540]                         |
+00481200                     | 8B34B9                                  | mov esi,dword ptr ds:[ecx+edi*4]                       |
+00481203                     | 8B95 90EEFFFF                           | mov edx,dword ptr ss:[ebp-1170]                        |
