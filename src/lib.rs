@@ -44,6 +44,12 @@ fn idle() {
 enum Error {
     #[error("{0}")]
     Module(#[from] module::Error),
+
+    #[error("cannot find global objects")]
+    ObjectsNotFound,
+
+    #[error("cannot find global names")]
+    NamesNotFound,
 }
 
 unsafe fn dump() -> Result<(), Error> {
@@ -53,58 +59,52 @@ unsafe fn dump() -> Result<(), Error> {
     
     let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
 
-    if let Some(global_objects) = game.find_pattern(&pattern) {
-        let global_objects = (global_objects + 2) as *const *const Objects;
-        let global_objects = global_objects.read_unaligned();
-        GLOBAL_OBJECTS = global_objects;
+    let global_objects = game.find_pattern(&pattern).ok_or(Error::ObjectsNotFound)?;
+    let global_objects = (global_objects + 2) as *const *const Objects;
+    let global_objects = global_objects.read_unaligned();
+    GLOBAL_OBJECTS = global_objects;
 
-        let pattern = [
-            Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
-            None, None, None, None,
-        ];
+    let pattern = [
+        Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
+        None, None, None, None,
+    ];
 
-        if let Some(global_names) = game.find_pattern(&pattern) {
-            let global_names = (global_names + 8) as *const *const Names;
-            let global_names = global_names.read_unaligned();
-            GLOBAL_NAMES = global_names;
+    let global_names = game.find_pattern(&pattern).ok_or(Error::NamesNotFound)?;
+    let global_names = (global_names + 8) as *const *const Names;
+    let global_names = global_names.read_unaligned();
+    GLOBAL_NAMES = global_names;
 
-            if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
-                info!("Dumping to {}", OBJECTS);
+    if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
+        info!("Dumping to {}", OBJECTS);
 
-                for &object in (*global_objects).iter() {
-                    if object.is_null() {
-                        continue;
-                    }
+        for &object in (*global_objects).iter() {
+            if object.is_null() {
+                continue;
+            }
 
-                    let address = object as usize;
-                    let object = &*object;
-                    
-                    if let Some(name) = object.full_name() {
-                        let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
-                    }
+            let address = object as usize;
+            let object = &*object;
+            
+            if let Some(name) = object.full_name() {
+                let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
+            }
+        }
+
+        if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
+            info!("Dumping to {}", NAMES);
+
+            for (i, &name) in (*global_names).iter().enumerate() {
+                if name.is_null() {
+                    continue;
                 }
-
-                if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
-                    info!("Dumping to {}", NAMES);
-
-                    for (i, &name) in (*global_names).iter().enumerate() {
-                        if name.is_null() {
-                            continue;
-                        }
-                        
-                        let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
-                    }
-                } else {
-                    error!("Unable to create {}", NAMES);
-                }
-            } else {
-                error!("Unable to create {}", OBJECTS);
+                
+                let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
             }
         } else {
-            error!("Unable to find global names.");
+            error!("Unable to create {}", NAMES);
         }
     } else {
-        error!("Unable to find global objects.");
+        error!("Unable to create {}", OBJECTS);
     }
 
     Ok(())
