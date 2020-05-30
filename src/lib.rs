@@ -1,7 +1,6 @@
 #![warn(clippy::pedantic)]
 
-use std::fs::File;
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, Read};
 use std::ptr;
 
 use log::{error, info};
@@ -20,6 +19,8 @@ use winapi::{
 };
 
 
+mod dump;
+
 mod game;
 use game::{Objects, Names};
 
@@ -27,8 +28,6 @@ mod macros;
 
 mod module;
 use module::Module;
-
-const NAMES: &str = "names.txt";
 
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
@@ -50,8 +49,8 @@ enum Error {
     #[error("cannot find global names")]
     NamesNotFound,
 
-    #[error("dump io error: {0}")]
-    DumpIoError(#[from] io::Error),
+    #[error("dump error: {0}")]
+    Dump(#[from] dump::Error),
 }
 
 unsafe fn find_globals() -> Result<(), Error> {
@@ -77,49 +76,11 @@ unsafe fn find_globals() -> Result<(), Error> {
     Ok(())
 }
 
-unsafe fn dump_objects() -> Result<(), Error> {
-    const OBJECTS: &str = "objects.txt";
-
-    let mut dump = File::create(OBJECTS).map(BufWriter::new)?;
-
-    info!("Dumping to {}", OBJECTS);
-
-    for &object in (*GLOBAL_OBJECTS).iter() {
-        if object.is_null() {
-            continue;
-        }
-
-        let address = object as usize;
-        let object = &*object;
-        
-        if let Some(name) = object.full_name() {
-            writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
-        }
-    }
-
-    Ok(())
-}
-
-unsafe fn dump_names() -> Result<(), Error> {
-    let mut dump = File::create(NAMES).map(BufWriter::new)?;
-
-    info!("Dumping to {}", NAMES);
-
-    for (i, &name) in (*GLOBAL_NAMES).iter().enumerate() {
-        if name.is_null() {
-            continue;
-        }
-        
-        writeln!(&mut dump, "[{}] {}", i, (*name).text())?;
-    }
-
-    Ok(())
-}
 
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    dump_objects()?;
-    dump_names()?;
+    dump::objects()?;
+    dump::names()?;
     Ok(())
 }
 
