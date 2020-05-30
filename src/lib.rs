@@ -62,10 +62,7 @@ pub struct Struct {
     pad1: [u8; 0x3a],
 }
 
-pub type GlobalObjects = Array<Object>;
-// pub type GlobalNames = Array<Name>;
-
-pub const GLOBAL_OBJECTS_PATTERN: [Option<u8>; 9] = [
+pub const GLOBAL_OBJECTS: [Option<u8>; 9] = [
     Some(0x8B),  Some(0x0D),  None,  None,  None,  None,  Some(0x8B),  Some(0x34),  Some(0xB9)
 ];
 
@@ -87,8 +84,21 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
         match Module::from("BorderlandsPreSequel.exe") {
             Ok(game) => {
                 info!("{:#x?}", game);
+                
                 // Find global objects.
-                // Find global names.
+                if let Some(global_objects) = game.find_pattern(&GLOBAL_OBJECTS) {
+                    let global_objects = (global_objects + 2) as *const *const Array<Object>;
+                    let global_objects = global_objects.read_unaligned();
+                    let global_objects = &*global_objects;
+
+                    info!("global_objects = {:?}, {}, {}", global_objects.data, global_objects.count, global_objects.max);
+
+                    // Find global names.
+
+
+                } else {
+                    error!("Unable to find global objects.");
+                }
             }
 
             Err(e) => eprintln!("{}", e)
