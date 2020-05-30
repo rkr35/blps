@@ -8,7 +8,7 @@ use std::ptr;
 use thiserror::Error;
 use winapi::shared::minwindef::HMODULE;
 use winapi::um::{
-    libloaderapi::{GetModuleHandleW, GetProcAddress},
+    libloaderapi::GetModuleHandleW,
     processthreadsapi::GetCurrentProcess,
     psapi::{GetModuleInformation, MODULEINFO},
 };

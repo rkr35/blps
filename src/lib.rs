@@ -9,7 +9,6 @@ use winapi::{
         libloaderapi::{DisableThreadLibraryCalls, FreeLibraryAndExitThread},
         processthreadsapi::CreateThread,
         winnt::DLL_PROCESS_ATTACH,
-        winuser::{MessageBoxW, MB_OK},
     },
 };
 

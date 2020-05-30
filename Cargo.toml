@@ -21,16 +21,14 @@ thiserror = "1.0"
 wchar = "0.6"
 winapi = { version = "0.3", features = [
     "consoleapi",
-    "errhandlingapi",
     "libloaderapi",
-    "memoryapi",
+    "memoryapi", # not used
     "minwindef",
     "processthreadsapi",
     "psapi",
     "synchapi",
     "wincon",
     "winnt",
-    "winuser",
 ]}
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
