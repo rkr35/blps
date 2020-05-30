@@ -1,8 +1,14 @@
 #![warn(clippy::pedantic)]
 
-use std::io::{self, Read};
+use std::borrow::Cow;
+use std::ffi::CStr;
+use std::fs::File;
+use std::io::{self, BufWriter, Read, Write};
+use std::iter;
+use std::ops::Deref;
 use std::os::raw::c_char;
 use std::ptr;
+use std::slice;
 
 use log::{error, info};
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
@@ -22,11 +28,30 @@ mod macros;
 mod module;
 use module::Module;
 
+pub type Objects = Array<*mut Object>;
+pub type Names = Array<*const Name>;
+
+const OBJECTS: &str = "objects.txt";
+const NAMES: &str = "names.txt";
+
+pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
+pub static mut GLOBAL_NAMES: *const Names = ptr::null();
+
 #[repr(C)]
 pub struct Array<T> {
     data: *mut T,
     count: u32,
     max: u32,
+}
+
+impl<T> Deref for Array<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            slice::from_raw_parts(self.data, self.count as usize)
+        }
+    }
 }
 
 #[repr(C)]
@@ -45,12 +70,44 @@ pub struct NameIndex {
 pub struct Object {
     vtable: usize,
     pad0: [u8; 0x1c],
-    index: u32,
+    pub index: u32,
     pad1: [u8; 0x4],
     pub outer: *mut Object,
     name: NameIndex,
     class: *mut Struct,
     pad2: [u8; 0x4],
+}
+
+impl Object {
+    pub unsafe fn full_name(&self) -> Option<String> {
+        if self.class.is_null() {
+            return None;
+        }
+
+        let outer_names: Option<Vec<_>> = self.iter_outer().map(|o| o.name()).collect();
+        let mut outer_names = outer_names?;
+        outer_names.reverse();
+        let name = outer_names.join(".");
+
+        let class = String::from((*self.class).field.object.name()?);
+
+        Some(class + " " + &name)
+    }
+
+    pub unsafe fn iter_outer(&self) -> impl Iterator<Item = &Self> {
+        iter::successors(Some(self), |current| current.outer.as_ref())
+    }
+
+    pub unsafe fn name(&self) -> Option<Cow<str>> {
+        let name = *(*GLOBAL_NAMES).get(self.name.index as usize)?;
+
+        if name.is_null() {
+            return None;
+        }
+
+        let name = CStr::from_ptr(&(*name).text as *const c_char);
+        Some(name.to_string_lossy())
+    }
 }
 
 #[repr(C)]
@@ -68,20 +125,6 @@ pub struct Struct {
     pub property_size: u16,
     pad1: [u8; 0x3a],
 }
-
-pub type Objects = Array<*mut Object>;
-pub type Names = Array<*const Name>;
-
-pub const GLOBAL_OBJECTS: [Option<u8>; 9] = [
-    Some(0x8B), Some(0x0D),
-    None, None, None, None, 
-    Some(0x8B), Some(0x34), Some(0xB9),
-];
-
-pub const GLOBAL_NAMES: [Option<u8>; 12] = [
-    Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
-    None, None, None, None,
-];
 
 fn idle() {
     println!("Idling. Press enter to continue.");
@@ -102,22 +145,45 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
             Ok(game) => {
                 info!("{:#x?}", game);
                 
-                // Find global objects.
-                if let Some(global_objects) = game.find_pattern(&GLOBAL_OBJECTS) {
+                let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
+
+                if let Some(global_objects) = game.find_pattern(&pattern) {
                     let global_objects = (global_objects + 2) as *const *const Objects;
                     let global_objects = global_objects.read_unaligned();
-                    let global_objects = &*global_objects;
+                    GLOBAL_OBJECTS = global_objects;
 
-                    info!("global_objects = {:?}, {}, {}", global_objects.data, global_objects.count, global_objects.max);
+                    let pattern = [
+                        Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
+                        None, None, None, None,
+                    ];
 
-                    if let Some(global_names) = game.find_pattern(&GLOBAL_NAMES) {
-                        // Find global names.
+                    if let Some(global_names) = game.find_pattern(&pattern) {
                         let global_names = (global_names + 8) as *const *const Names;
                         let global_names = global_names.read_unaligned();
-                        let global_names = &*global_names;
-    
-                        info!("global_names = {:?}, {}, {}", global_names.data, global_names.count, global_names.max);
+                        GLOBAL_NAMES = global_names;
 
+                        if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
+                            let global_objects = &*global_objects;
+
+                            info!("Dumping to {}", OBJECTS);
+                            for &object in global_objects.iter() {
+                                if object.is_null() {
+                                    continue;
+                                }
+        
+                                let address = object as usize;
+                                let object = &*object;
+                                
+                                if let Some(name) = object.full_name() {
+                                    let _ = writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address);
+                                }
+                            }
+
+                            info!("Dumping to {}", NAMES);
+
+                        } else {
+                            error!("Unable to create {}", OBJECTS);
+                        }
                     } else {
                         error!("Unable to find global names.");
                     }
@@ -126,7 +192,7 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
                 }
             }
 
-            Err(e) => eprintln!("{}", e)
+            Err(e) => error!("{}", e)
         }
     }
 
