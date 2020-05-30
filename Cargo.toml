@@ -1,0 +1,36 @@
+[package]
+name = "blps"
+version = "0.1.0"
+authors = ["rkr35 <rkr35@dragons.drexel.edu>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+debug = true
+incremental = false
+lto = "fat"
+panic = "abort"
+
+[dependencies]
+log = "0.4"
+simplelog = "0.7"
+thiserror = "1.0"
+wchar = "0.6"
+winapi = { version = "0.3", features = [
+    "consoleapi",
+    "errhandlingapi",
+    "libloaderapi",
+    "memoryapi",
+    "minwindef",
+    "processthreadsapi",
+    "psapi",
+    "synchapi",
+    "wincon",
+    "winnt",
+    "winuser",
+]}
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
