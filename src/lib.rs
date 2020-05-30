@@ -60,6 +60,12 @@ pub struct Name {
     text: c_char,
 }
 
+impl Name {
+    pub unsafe fn text(&self) -> Cow<str> {
+        CStr::from_ptr(&self.text as *const c_char).to_string_lossy()
+    }
+}
+
 #[repr(C)]
 pub struct NameIndex {
     index: u32,
@@ -102,11 +108,10 @@ impl Object {
         let name = *(*GLOBAL_NAMES).get(self.name.index as usize)?;
 
         if name.is_null() {
-            return None;
+            None
+        } else {
+            Some((*name).text())
         }
-
-        let name = CStr::from_ptr(&(*name).text as *const c_char);
-        Some(name.to_string_lossy())
     }
 }
 
@@ -163,10 +168,9 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
                         GLOBAL_NAMES = global_names;
 
                         if let Ok(mut objects_dump) = File::create(OBJECTS).map(BufWriter::new) {
-                            let global_objects = &*global_objects;
-
                             info!("Dumping to {}", OBJECTS);
-                            for &object in global_objects.iter() {
+
+                            for &object in (*global_objects).iter() {
                                 if object.is_null() {
                                     continue;
                                 }
@@ -179,8 +183,19 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
                                 }
                             }
 
-                            info!("Dumping to {}", NAMES);
+                            if let Ok(mut names_dump) = File::create(NAMES).map(BufWriter::new) {
+                                info!("Dumping to {}", NAMES);
 
+                                for (i, &name) in (*global_names).iter().enumerate() {
+                                    if name.is_null() {
+                                        continue;
+                                    }
+                                    
+                                    let _ = writeln!(&mut names_dump, "[{}] {}", i, (*name).text());
+                                }
+                            } else {
+                                error!("Unable to create {}", NAMES);
+                            }
                         } else {
                             error!("Unable to create {}", OBJECTS);
                         }
