@@ -1,27 +1,25 @@
 #![warn(clippy::pedantic)]
 
+use std::io::{self, Read};
 use std::ptr;
 
-use wchar::wch_c as w;
+use log::{error, info};
+use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use winapi::{
     shared::minwindef::{BOOL, DWORD, HINSTANCE, LPVOID, TRUE},
     um::{
+        consoleapi::AllocConsole,
         libloaderapi::{DisableThreadLibraryCalls, FreeLibraryAndExitThread},
         processthreadsapi::CreateThread,
+        synchapi::Sleep,
+        wincon::FreeConsole,
         winnt::DLL_PROCESS_ATTACH,
     },
 };
 
 mod macros;
 mod module;
-
-macro_rules! msg_box {
-    ($text:literal, $caption:literal) => {
-        let text = w!($text);
-        let caption = w!($caption);
-        MessageBoxW(ptr::null_mut(), text.as_ptr(), caption.as_ptr(), MB_OK)
-    }
-}
+use module::Module;
 
 #[repr(C)]
 pub struct Array<T> {
@@ -67,12 +65,41 @@ pub struct Struct {
 pub type GlobalObjects = Array<Object>;
 // pub type GlobalNames = Array<Name>;
 
+pub const GLOBAL_OBJECTS_PATTERN: [Option<u8>; 9] = [
+    Some(0x8B),  Some(0x0D),  None,  None,  None,  None,  Some(0x8B),  Some(0x34),  Some(0xB9)
+];
+
+fn idle() {
+    println!("Idling. Press enter to continue.");
+    let mut sentinel = [0; 2];
+    let _ = io::stdin().read_exact(&mut sentinel);
+}
+
 unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
-    msg_box!("Press OK to free library.", "on_attach()");
+    AllocConsole();
+    println!("Allocated console.");
 
-    // Find global objects.
-    // Find global names.
+    if let Err(e) = TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed) {
+        eprintln!("Failed to initialize logger: {}", e);
+    } else {
+        info!("Initialized logger.");
 
+        match Module::from("BorderlandsPreSequel.exe") {
+            Ok(game) => {
+                info!("{:#x?}", game);
+                // Find global objects.
+                // Find global names.
+            }
+
+            Err(e) => eprintln!("{}", e)
+        }
+    }
+
+    idle();
+    println!("Sleeping 1 second before detaching.");
+    Sleep(1000);
+
+    FreeConsole();
     FreeLibraryAndExitThread(dll.cast(), 0);
 
     0
