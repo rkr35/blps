@@ -21,8 +21,55 @@ macro_rules! msg_box {
     }
 }
 
+#[repr(C)]
+pub struct Array<T> {
+    data: *mut T,
+    count: u32,
+    max: u32,
+}
+
+#[repr(C)]
+pub struct Name {
+    index: u32,
+    number: u32,
+}
+
+#[repr(C)]
+pub struct Object {
+    vtable: usize,
+    pad0: [u8; 0x1c],
+    index: u32,
+    pad1: [u8; 0x4],
+    pub outer: *mut Object,
+    name: Name,
+    class: *mut Struct,
+    pad2: [u8; 0x4],
+}
+
+#[repr(C)]
+pub struct Field {
+    object: Object,
+    pub next: *mut Field,
+}
+
+#[repr(C)]
+pub struct Struct {
+    field: Field,
+    pad0: [u8; 8],
+    pub super_field: *mut Struct,
+    pub children: *mut Field,
+    pub property_size: u16,
+    pad1: [u8; 0x3a],
+}
+
+pub type GlobalObjects = Array<Object>;
+// pub type GlobalNames = Array<Name>;
+
 unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
     msg_box!("Press OK to free library.", "on_attach()");
+
+    // Find global objects.
+    // Find global names.
 
     FreeLibraryAndExitThread(dll.cast(), 0);
 
