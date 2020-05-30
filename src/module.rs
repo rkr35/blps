@@ -11,7 +11,7 @@ use winapi::um::{
 };
 
 #[derive(Error, Debug)]
-pub enum ErrorKind<'a> {
+pub enum ErrorKind {
     #[error("failed to get a handle to the module")]
     NullModule,
 
@@ -21,13 +21,13 @@ pub enum ErrorKind<'a> {
 
 #[derive(Error, Debug)]
 #[error("\"{module}\" error: {kind}")]
-pub struct Error<'a> {
+pub struct Error {
     module: String,
-    kind: ErrorKind<'a>,
+    kind: ErrorKind,
 }
 
-impl<'a> Error<'a> {
-    fn new<'e>(module: &str, kind: ErrorKind<'e>) -> Error<'e> {
+impl Error {
+    fn new(module: &str, kind: ErrorKind) -> Error {
         Error {
             module: String::from(module),
             kind,
