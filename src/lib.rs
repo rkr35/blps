@@ -28,7 +28,6 @@ mod macros;
 mod module;
 use module::Module;
 
-const OBJECTS: &str = "objects.txt";
 const NAMES: &str = "names.txt";
 
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
@@ -55,10 +54,8 @@ enum Error {
     DumpIoError(#[from] io::Error),
 }
 
-unsafe fn dump() -> Result<(), Error> {
+unsafe fn find_globals() -> Result<(), Error> {
     let game = Module::from("BorderlandsPreSequel.exe")?;
-
-    info!("{:#x?}", game);
     
     let pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
 
@@ -77,11 +74,17 @@ unsafe fn dump() -> Result<(), Error> {
     let global_names = global_names.read_unaligned();
     GLOBAL_NAMES = global_names;
 
-    let mut objects_dump = File::create(OBJECTS).map(BufWriter::new)?;
+    Ok(())
+}
+
+unsafe fn dump_objects() -> Result<(), Error> {
+    const OBJECTS: &str = "objects.txt";
+
+    let mut dump = File::create(OBJECTS).map(BufWriter::new)?;
 
     info!("Dumping to {}", OBJECTS);
 
-    for &object in (*global_objects).iter() {
+    for &object in (*GLOBAL_OBJECTS).iter() {
         if object.is_null() {
             continue;
         }
@@ -90,27 +93,33 @@ unsafe fn dump() -> Result<(), Error> {
         let object = &*object;
         
         if let Some(name) = object.full_name() {
-            writeln!(&mut objects_dump, "[{}] {} {:#x}", object.index, name, address)?;
+            writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
         }
     }
 
-    let mut names_dump = File::create(NAMES).map(BufWriter::new)?;
+    Ok(())
+}
+
+unsafe fn dump_names() -> Result<(), Error> {
+    let mut dump = File::create(NAMES).map(BufWriter::new)?;
 
     info!("Dumping to {}", NAMES);
 
-    for (i, &name) in (*global_names).iter().enumerate() {
+    for (i, &name) in (*GLOBAL_NAMES).iter().enumerate() {
         if name.is_null() {
             continue;
         }
         
-        writeln!(&mut names_dump, "[{}] {}", i, (*name).text())?;
+        writeln!(&mut dump, "[{}] {}", i, (*name).text())?;
     }
 
     Ok(())
 }
 
 unsafe fn run() -> Result<(), Error> {
-    dump()?;
+    find_globals()?;
+    dump_objects()?;
+    dump_names()?;
     Ok(())
 }
 
