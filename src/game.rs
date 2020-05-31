@@ -6,10 +6,22 @@ use std::iter;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
 use std::os::windows::ffi::OsStringExt;
+use std::ptr;
 use std::slice;
 
 pub type Objects = Array<*mut Object>;
 pub type Names = Array<*const Name>;
+
+impl Objects {
+    pub unsafe fn find(&self, full_name: &str) -> Option<*const Object> {
+        self
+            .iter()
+            .copied()
+            .filter(|o| !o.is_null())
+            .find(|&o| (*o).full_name().map_or(false, |n| n == full_name))
+            .map(|o| o as *const Object)
+    }
+}
 
 #[repr(C)]
 pub struct Array<T> {
@@ -90,6 +102,10 @@ impl Object {
         } else {
             Some((*name).text())
         }
+    }
+
+    pub unsafe fn is(&self, class: *const Struct) -> bool {
+        self.iter_class().any(|c| ptr::eq(c, class))
     }
 }
 

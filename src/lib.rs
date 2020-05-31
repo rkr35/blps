@@ -80,6 +80,7 @@ unsafe fn run() -> Result<(), Error> {
     find_globals()?;
     dump::names()?;
     dump::objects()?;
+    dump::sdk()?;
     Ok(())
 }
 
