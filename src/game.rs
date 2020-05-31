@@ -78,6 +78,10 @@ impl Object {
         iter::successors(Some(self), |current| current.outer.as_ref())
     }
 
+    pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Struct> {
+        iter::successors(self.class.as_ref(), |current| current.super_field.as_ref())
+    }
+
     pub unsafe fn name(&self) -> Option<Cow<str>> {
         let name = *(*GLOBAL_NAMES).get(self.name.index as usize)?;
 
