@@ -1,10 +1,11 @@
 use crate::GLOBAL_NAMES;
 
 use std::borrow::Cow;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsString};
 use std::iter;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
+use std::os::windows::ffi::OsStringExt;
 use std::slice;
 
 pub type Objects = Array<*mut Object>;
@@ -94,6 +95,20 @@ pub struct Field {
     pub next: *mut Field,
 }
 
+impl Deref for Field {
+    type Target = Object;
+
+    fn deref(&self) -> &Self::Target {
+        &self.object
+    }
+}
+
+impl DerefMut for Field {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.object
+    }
+}
+
 #[repr(C)]
 pub struct Struct {
     field: Field,
@@ -102,4 +117,46 @@ pub struct Struct {
     pub children: *mut Field,
     pub property_size: u16,
     pad1: [u8; 0x3a],
+}
+
+impl Deref for Struct {
+    type Target = Field;
+
+    fn deref(&self) -> &Self::Target {
+        &self.field
+    }
+}
+
+impl DerefMut for Struct {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.field
+    }
+}
+
+pub type FString = Array<u16>; // &[u16] -> OsString -> Cow<str>
+
+impl FString {
+    pub fn to_string(&self) -> OsString {
+        OsString::from_wide(self)
+    }
+}
+
+#[repr(C)]
+pub struct Const {
+    pub field: Field,
+    pub value: FString,
+}
+
+impl Deref for Const {
+    type Target = Field;
+
+    fn deref(&self) -> &Self::Target {
+        &self.field
+    }
+}
+
+impl DerefMut for Const {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.field
+    }
 }
