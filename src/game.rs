@@ -64,7 +64,7 @@ impl Object {
             return None;
         }
 
-        let outer_names: Option<Vec<_>> = self.iter_outer().map(|o| (*o).name()).collect();
+        let outer_names: Option<Vec<_>> = self.iter_outer().map(|o| o.name()).collect();
         let mut outer_names = outer_names?;
         outer_names.reverse();
         let name = outer_names.join(".");
@@ -74,26 +74,8 @@ impl Object {
         Some(class + " " + &name)
     }
 
-    pub unsafe fn iter_outer(&self) -> impl Iterator<Item = *const Object> {
-        iter::successors(Some(self as *const Object), |&current| if (*current).outer.is_null() {
-            None
-        } else {
-            Some((*current).outer)
-        })
-    }
-
-    pub unsafe fn iter_class(&self) -> impl Iterator<Item = *mut Struct> {
-        let start = if self.class.is_null() {
-            None
-        } else {
-            Some(self.class)
-        };
-
-        iter::successors(start, |&current| if (*current).super_field.is_null() {
-            None
-        } else {
-            Some((*current).super_field)
-        })
+    pub unsafe fn iter_outer(&self) -> impl Iterator<Item = &Self> {
+        iter::successors(Some(self), |current| current.outer.as_ref())
     }
 
     pub unsafe fn name(&self) -> Option<Cow<str>> {
