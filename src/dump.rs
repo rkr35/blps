@@ -1,6 +1,7 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use crate::game::{Struct};
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::ptr;
@@ -58,7 +59,32 @@ pub unsafe fn objects() -> Result<(), Error> {
     Ok(())
 }
 
+struct Const {
+}
+
+struct Enum {
+}
+
+struct Structure {
+}
+
+struct Class {
+}
+
+struct Submodule {
+    consts: Vec<Const>,
+    enums: Vec<Enum>,
+    structs: Vec<Struct>,
+}
+
+struct Module {
+    classes: Vec<Class>,
+    submodules: HashMap<String, Submodule>,
+}
+
 pub unsafe fn sdk() -> Result<(), Error> {
+    let mut modules: HashMap<String, Module> = HashMap::new();
+
     let constant: *const Struct = (*GLOBAL_OBJECTS)
         .find("Class Core.Const")
         .map(|o| o.cast())
@@ -66,9 +92,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     for &object in (*GLOBAL_OBJECTS).iter().filter(|o| !o.is_null()) {
         if (*object).is(constant) {
-            if let Some(name) = (*object).full_name() {
-                info!("{} is a constant.", name);
-            }
+            
         }
     }
 
