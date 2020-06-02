@@ -1,6 +1,5 @@
 use crate::GLOBAL_NAMES;
 
-use std::borrow::Cow;
 use std::ffi::{CStr, OsString};
 use std::iter;
 use std::ops::{Deref, DerefMut};
@@ -47,8 +46,8 @@ pub struct Name {
 }
 
 impl Name {
-    pub unsafe fn text(&self) -> Cow<str> {
-        CStr::from_ptr(&self.text as *const c_char).to_string_lossy()
+    pub unsafe fn text(&self) -> Option<&str> {
+        CStr::from_ptr(&self.text as *const c_char).to_str().ok()
     }
 }
 
@@ -94,13 +93,13 @@ impl Object {
         iter::successors(self.class.as_ref(), |current| current.super_field.as_ref())
     }
 
-    pub unsafe fn name(&self) -> Option<Cow<str>> {
+    pub unsafe fn name(&self) -> Option<&str> {
         let name = *(*GLOBAL_NAMES).get(self.name.index as usize)?;
 
         if name.is_null() {
             None
         } else {
-            Some((*name).text())
+            (*name).text()
         }
     }
 
