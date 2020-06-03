@@ -3,8 +3,9 @@ use crate::game::{Const, Object, Struct};
 
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::fs::{self, File};
+use std::io::{self, BufWriter, ErrorKind, Write};
+use std::path::PathBuf;
 
 use log::info;
 use thiserror::Error;
@@ -22,6 +23,12 @@ pub enum Error {
 
     #[error("null name for {0:?}")]
     NullName(*const Object),
+
+    #[error("unable to create SDK folder: {0}")]
+    UnableToCreateSdkFolder(io::Error),
+
+    #[error("unable to create module or submodule folder: {0}")]
+    UnableToCreateModuleFolder(io::Error),
 }
 
 pub unsafe fn names() -> Result<(), Error> {
@@ -130,6 +137,39 @@ pub unsafe fn sdk() -> Result<(), Error> {
                 value: (*object.cast::<Const>()).value.to_string(),
             });
         }
+    }
+
+    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
+    let mut path = PathBuf::from(SDK_PATH);
+
+    if let Err(e) = fs::create_dir(&path) {
+        if e.kind() != ErrorKind::AlreadyExists {
+            return Err(Error::UnableToCreateSdkFolder(e));
+        }
+    }
+
+    for (module_name, module) in modules {
+        path.push(module_name);
+
+        if let Err(e) = fs::create_dir(&path) {
+            if e.kind() != ErrorKind::AlreadyExists {
+                return Err(Error::UnableToCreateModuleFolder(e));
+            }
+        }
+
+        for (submodule_name, submodule) in module.submodules {
+            path.push(submodule_name);
+
+            if let Err(e) = fs::create_dir(&path) {
+                if e.kind() != ErrorKind::AlreadyExists {
+                    return Err(Error::UnableToCreateModuleFolder(e));
+                }
+            }
+
+            path.pop();
+        }
+
+        path.pop();
     }
 
     Ok(())
