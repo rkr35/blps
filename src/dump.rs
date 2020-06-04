@@ -29,6 +29,9 @@ pub enum Error {
 
     #[error("unable to create module or submodule folder: {0}")]
     UnableToCreateModuleFolder(io::Error),
+
+    #[error("failed to convert OsString \"{0:?}\" to String")]
+    StringConversion(OsString),
 }
 
 pub unsafe fn names() -> Result<(), Error> {
@@ -77,7 +80,7 @@ pub unsafe fn objects() -> Result<(), Error> {
 #[derive(Debug)]
 struct Constant<'n> {
     name: &'n str,
-    value: OsString,
+    value: String,
 }
 
 #[derive(Debug)]
@@ -105,6 +108,62 @@ struct Module<'sm, 'n> {
     submodules: HashMap<&'sm str, Submodule<'n>>,
 }
 
+unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Object; 2], Error> {
+    let [module, submodule] = (*object)
+        .iter_outer()
+        .fold(
+            [None, None],
+            |[module, _], outer| [Some(outer), module]
+        );
+
+    let module = module.ok_or(Error::OutersIsFewerThanTwo(object))?;
+    let submodule = submodule.ok_or(Error::OutersIsFewerThanTwo(object))?;
+
+    Ok([module, submodule])
+}
+
+unsafe fn make_constant(object: *const Object) -> Result<Constant<'static>, Error> {
+    let value = {
+        // Cast so we can access fields of constant.
+        let object: *const Const = object.cast();
+
+        // Construct a printable string.
+        let value: OsString = (*object).value.to_string();
+        let mut value: String = value.into_string().map_err(Error::StringConversion)?;
+        
+        // The strings in memory are C strings, so they have null terminators that
+        // Rust strings don't care for.
+        // Get rid of that null-terminator so we don't see a funky '?' in the human-
+        // readable output.
+        if value.ends_with(char::from(0)) {
+            value.pop();
+        }
+
+        value
+    };
+
+    Ok(Constant {
+        name: (*object).name().ok_or(Error::NullName(object))?,
+        value,
+    })
+}
+
+unsafe fn process_constant(modules: &mut HashMap<&str, Module>, object: *const Object) -> Result<(), Error> {
+    let [module, submodule] = get_module_and_submodule(object)?;
+
+    let submodule = modules
+        .entry((*module).name().ok_or(Error::NullName(module))?)
+        .or_default()
+        .submodules
+        .entry((*submodule).name().ok_or(Error::NullName(submodule))?)
+        .or_default();
+
+
+    submodule.consts.push(make_constant(object)?);
+
+    Ok(())
+}
+
 pub unsafe fn sdk() -> Result<(), Error> {
     let mut modules: HashMap<&str, Module> = HashMap::new();
 
@@ -115,27 +174,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     for &object in (*GLOBAL_OBJECTS).iter().filter(|o| !o.is_null()) {
         if (*object).is(constant) {
-            let [module, submodule] = (*object)
-                .iter_outer()
-                .fold(
-                    [None, None],
-                    |[module, _], outer| [Some(outer), module]
-                );
-
-            let module = module.ok_or(Error::OutersIsFewerThanTwo(object))?;
-            let submodule = submodule.ok_or(Error::OutersIsFewerThanTwo(object))?;
-
-            let submodule = modules
-                .entry(module.name().ok_or(Error::NullName(module))?)
-                .or_default()
-                .submodules
-                .entry(submodule.name().ok_or(Error::NullName(submodule))?)
-                .or_default();
-
-            submodule.consts.push(Constant {
-                name: (*object).name().ok_or(Error::NullName(object))?,
-                value: (*object.cast::<Const>()).value.to_string(),
-            });
+            process_constant(&mut modules, object)?;
         }
     }
 
@@ -164,6 +203,17 @@ pub unsafe fn sdk() -> Result<(), Error> {
                 if e.kind() != ErrorKind::AlreadyExists {
                     return Err(Error::UnableToCreateModuleFolder(e));
                 }
+            }
+
+            const CONSTANTS: &str = "constants.txt";
+
+            // Write out the constants in a file named "constants.txt"
+            path.push(CONSTANTS);
+            let mut constants = File::create(&path).map(BufWriter::new)?;
+            path.pop();
+
+            for constant in submodule.consts {
+                writeln!(&mut constants, "{} = {}", constant.name, constant.value)?;
             }
 
             path.pop();

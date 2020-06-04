@@ -78,8 +78,8 @@ unsafe fn find_globals() -> Result<(), Error> {
 
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    dump::names()?;
-    dump::objects()?;
+    // dump::names()?;
+    // dump::objects()?;
     dump::sdk()?;
     Ok(())
 }
