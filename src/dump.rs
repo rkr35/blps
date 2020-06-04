@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, ErrorKind, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use log::info;
 use thiserror::Error;
@@ -24,11 +24,8 @@ pub enum Error {
     #[error("null name for {0:?}")]
     NullName(*const Object),
 
-    #[error("unable to create SDK folder: {0}")]
-    UnableToCreateSdkFolder(io::Error),
-
-    #[error("unable to create module or submodule folder: {0}")]
-    UnableToCreateModuleFolder(io::Error),
+    #[error("unable to create directory {0:?}")]
+    UnableToCreateDir(PathBuf),
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
@@ -164,6 +161,16 @@ unsafe fn process_constant(modules: &mut HashMap<&str, Module>, object: *const O
     Ok(())
 }
 
+fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
+    if let Err(e) = fs::create_dir(&path) {
+        if e.kind() != ErrorKind::AlreadyExists {
+            return Err(Error::UnableToCreateDir(path.as_ref().to_path_buf()));
+        }
+    }
+    
+    Ok(())
+}
+
 pub unsafe fn sdk() -> Result<(), Error> {
     let mut modules: HashMap<&str, Module> = HashMap::new();
 
@@ -181,33 +188,20 @@ pub unsafe fn sdk() -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
     let mut path = PathBuf::from(SDK_PATH);
 
-    if let Err(e) = fs::create_dir(&path) {
-        if e.kind() != ErrorKind::AlreadyExists {
-            return Err(Error::UnableToCreateSdkFolder(e));
-        }
-    }
+    create_dir(&path)?;
 
     for (module_name, module) in modules {
         path.push(module_name);
 
-        if let Err(e) = fs::create_dir(&path) {
-            if e.kind() != ErrorKind::AlreadyExists {
-                return Err(Error::UnableToCreateModuleFolder(e));
-            }
-        }
+        create_dir(&path)?;
 
         for (submodule_name, submodule) in module.submodules {
             path.push(submodule_name);
 
-            if let Err(e) = fs::create_dir(&path) {
-                if e.kind() != ErrorKind::AlreadyExists {
-                    return Err(Error::UnableToCreateModuleFolder(e));
-                }
-            }
+            create_dir(&path)?;
 
             const CONSTANTS: &str = "constants.txt";
 
-            // Write out the constants in a file named "constants.txt"
             path.push(CONSTANTS);
             let mut constants = File::create(&path).map(BufWriter::new)?;
             path.pop();
