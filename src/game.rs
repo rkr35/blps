@@ -15,8 +15,6 @@ impl Objects {
     pub unsafe fn find(&self, full_name: &str) -> Option<*const Object> {
         self
             .iter()
-            .copied()
-            .filter(|o| !o.is_null())
             .find(|&o| (*o).full_name().map_or(false, |n| n == full_name))
             .map(|o| o as *const Object)
     }
@@ -36,6 +34,18 @@ impl<T> Deref for Array<T> {
         unsafe {
             slice::from_raw_parts(self.data, self.count as usize)
         }
+    }
+}
+
+impl<T> Array<*const T> {
+    pub fn iter(&self) -> impl Iterator<Item = *const T> + '_ {
+        self.deref().iter().filter(|o| !o.is_null()).copied()
+    }
+}
+
+impl<T> Array<*mut T> {
+    pub fn iter(&self) -> impl Iterator<Item = *mut T> + '_ {
+        self.deref().iter().filter(|o| !o.is_null()).copied()
     }
 }
 

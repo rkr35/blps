@@ -38,10 +38,7 @@ pub unsafe fn names() -> Result<(), Error> {
 
     info!("Dumping to {}", NAMES);
 
-    for (i, &name) in (*GLOBAL_NAMES).iter().enumerate() {
-        if name.is_null() {
-            continue;
-        }
+    for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
         
         if let Some(text) = (*name).text() {
             writeln!(&mut dump, "[{}] {}", i, text)?;
@@ -58,11 +55,7 @@ pub unsafe fn objects() -> Result<(), Error> {
 
     info!("Dumping to {}", OBJECTS);
 
-    for &object in (*GLOBAL_OBJECTS).iter() {
-        if object.is_null() {
-            continue;
-        }
-
+    for object in (*GLOBAL_OBJECTS).iter() {
         let address = object as usize;
         let object = &*object;
         
@@ -183,7 +176,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
         .map(|o| o.cast())
         .ok_or(Error::StaticClassNotFound("Class Core.Const"))?;
 
-    for &object in (*GLOBAL_OBJECTS).iter().filter(|o| !o.is_null()) {
+    for object in (*GLOBAL_OBJECTS).iter() {
         if (*object).is(constant) {
             process_constant(&mut modules, object)?;
         }
