@@ -179,7 +179,7 @@ unsafe fn make_constant(object: *const Object) -> Result<Constant, Error> {
     })
 }
 
-unsafe fn write_sdk(modules: Modules) -> Result<(), Error> {
+fn write_sdk(modules: Modules) -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
 
     let mut path = PathBuf::from(SDK_PATH);
@@ -207,7 +207,7 @@ fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
     Ok(())
 }
 
-unsafe fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
+fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
     for (submodule_name, submodule) in submodules {
         path.push(submodule_name);
         create_dir(&path)?;
@@ -221,7 +221,7 @@ unsafe fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Resul
     Ok(())
 }
 
-unsafe fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Error> {
+fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Error> {
     const CONSTANTS: &str = "constants.txt";
     
     path.push(CONSTANTS);
@@ -235,7 +235,7 @@ unsafe fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<
     Ok(())
 }
 
-unsafe fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Result<(), Error> {
+fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Result<(), Error> {
     const ENUMERATIONS: &str = "enums.rs";
     
     path.push(ENUMERATIONS);
