@@ -105,6 +105,10 @@ struct Module<'sm, 'n> {
     submodules: HashMap<&'sm str, Submodule<'n>>,
 }
 
+unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
+    Ok((*object).name().ok_or(Error::NullName(object))?)
+}
+
 unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Object; 2], Error> {
     let [module, submodule] = (*object)
         .iter_outer()
@@ -140,7 +144,7 @@ unsafe fn make_constant(object: *const Object) -> Result<Constant<'static>, Erro
     };
 
     Ok(Constant {
-        name: (*object).name().ok_or(Error::NullName(object))?,
+        name: name(object)?,
         value,
     })
 }
@@ -149,10 +153,10 @@ unsafe fn process_constant(modules: &mut HashMap<&str, Module>, object: *const O
     let [module, submodule] = get_module_and_submodule(object)?;
 
     let submodule = modules
-        .entry((*module).name().ok_or(Error::NullName(module))?)
+        .entry(name(module)?)
         .or_default()
         .submodules
-        .entry((*submodule).name().ok_or(Error::NullName(submodule))?)
+        .entry(name(submodule)?)
         .or_default();
 
 
