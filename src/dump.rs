@@ -10,6 +10,9 @@ use std::path::{Path, PathBuf};
 use log::info;
 use thiserror::Error;
 
+type Modules<'a> = HashMap<&'a str, Module>;
+type Submodules<'a> = HashMap<&'a str, Submodule>;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -68,8 +71,8 @@ pub unsafe fn objects() -> Result<(), Error> {
 }
 
 #[derive(Debug)]
-struct Constant<'n> {
-    name: &'n str,
+struct Constant {
+    name: &'static str,
     value: String,
 }
 
@@ -86,16 +89,16 @@ struct Class {
 }
 
 #[derive(Debug, Default)]
-struct Submodule<'n> {
-    consts: Vec<Constant<'n>>,
-    enums: Vec<Enumeration>,
-    structs: Vec<Structure>,
+struct Submodule {
+    constants: Vec<Constant>,
+    enumerations: Vec<Enumeration>,
+    structures: Vec<Structure>,
 }
 
 #[derive(Debug, Default)]
-struct Module<'sm, 'n> {
+struct Module {
     classes: Vec<Class>,
-    submodules: HashMap<&'sm str, Submodule<'n>>,
+    submodules: Submodules<'static>,
 }
 
 unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
@@ -116,7 +119,7 @@ unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Obje
     Ok([module, submodule])
 }
 
-unsafe fn make_constant(object: *const Object) -> Result<Constant<'static>, Error> {
+unsafe fn make_constant(object: *const Object) -> Result<Constant, Error> {
     let value = {
         // Cast so we can access fields of constant.
         let object: *const Const = object.cast();
@@ -142,7 +145,7 @@ unsafe fn make_constant(object: *const Object) -> Result<Constant<'static>, Erro
     })
 }
 
-unsafe fn process_constant(modules: &mut HashMap<&str, Module>, object: *const Object) -> Result<(), Error> {
+unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
     let [module, submodule] = get_module_and_submodule(object)?;
 
     let submodule = modules
@@ -153,7 +156,7 @@ unsafe fn process_constant(modules: &mut HashMap<&str, Module>, object: *const O
         .or_default();
 
 
-    submodule.consts.push(make_constant(object)?);
+    submodule.constants.push(make_constant(object)?);
 
     Ok(())
 }
@@ -168,8 +171,53 @@ fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
     Ok(())
 }
 
+unsafe fn write_constants(path: &mut PathBuf, constants: &Vec<Constant>) -> Result<(), Error> {
+    const CONSTANTS: &str = "constants.txt";
+    
+    path.push(CONSTANTS);
+    let mut f = File::create(&path).map(BufWriter::new)?;
+    path.pop();
+
+    for constant in constants {
+        writeln!(&mut f, "{} = {}", constant.name, constant.value)?;
+    }
+
+    Ok(())
+}
+
+unsafe fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
+    for (submodule_name, submodule) in submodules {
+        path.push(submodule_name);
+        create_dir(&path)?;
+
+        write_constants(path, &submodule.constants)?;
+        
+        path.pop();
+    }
+
+    Ok(())
+}
+
+unsafe fn write_sdk(modules: Modules) -> Result<(), Error> {
+    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
+
+    let mut path = PathBuf::from(SDK_PATH);
+    create_dir(&path)?;
+
+    for (module_name, module) in modules {
+        path.push(module_name);
+        create_dir(&path)?;
+
+        write_submodules(&mut path, &module.submodules)?;
+
+        path.pop();
+    }
+
+    Ok(())
+}
+
 pub unsafe fn sdk() -> Result<(), Error> {
-    let mut modules: HashMap<&str, Module> = HashMap::new();
+    let mut modules: Modules = Modules::new();
 
     let constant: *const Struct = (*GLOBAL_OBJECTS)
         .find("Class Core.Const")
@@ -182,36 +230,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
         }
     }
 
-    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
-    let mut path = PathBuf::from(SDK_PATH);
-
-    create_dir(&path)?;
-
-    for (module_name, module) in modules {
-        path.push(module_name);
-
-        create_dir(&path)?;
-
-        for (submodule_name, submodule) in module.submodules {
-            path.push(submodule_name);
-
-            create_dir(&path)?;
-
-            const CONSTANTS: &str = "constants.txt";
-
-            path.push(CONSTANTS);
-            let mut constants = File::create(&path).map(BufWriter::new)?;
-            path.pop();
-
-            for constant in submodule.consts {
-                writeln!(&mut constants, "{} = {}", constant.name, constant.value)?;
-            }
-
-            path.pop();
-        }
-
-        path.pop();
-    }
+    write_sdk(modules)?;
 
     Ok(())
 }
