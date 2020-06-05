@@ -155,7 +155,6 @@ unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Resu
         .entry(name(submodule)?)
         .or_default();
 
-
     submodule.constants.push(make_constant(object)?);
 
     Ok(())
