@@ -10,9 +10,6 @@ use std::path::{Path, PathBuf};
 use log::info;
 use thiserror::Error;
 
-type Modules<'a> = HashMap<&'a str, Module>;
-type Submodules<'a> = HashMap<&'a str, Submodule>;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("io error: {0}")]
@@ -34,41 +31,8 @@ pub enum Error {
     StringConversion(OsString),
 }
 
-pub unsafe fn names() -> Result<(), Error> {
-    const NAMES: &str = "names.txt";
-
-    let mut dump = File::create(NAMES).map(BufWriter::new)?;
-
-    info!("Dumping to {}", NAMES);
-
-    for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
-        
-        if let Some(text) = (*name).text() {
-            writeln!(&mut dump, "[{}] {}", i, text)?;
-        }
-    }
-
-    Ok(())
-}
-
-pub unsafe fn objects() -> Result<(), Error> {
-    const OBJECTS: &str = "objects.txt";
-
-    let mut dump = File::create(OBJECTS).map(BufWriter::new)?;
-
-    info!("Dumping to {}", OBJECTS);
-
-    for object in (*GLOBAL_OBJECTS).iter() {
-        let address = object as usize;
-        let object = &*object;
-        
-        if let Some(name) = object.full_name() {
-            writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
-        }
-    }
-
-    Ok(())
-}
+type Modules<'a> = HashMap<&'a str, Module>;
+type Submodules<'a> = HashMap<&'a str, Submodule>;
 
 #[derive(Debug)]
 struct Constant {
@@ -101,8 +65,74 @@ struct Module {
     submodules: Submodules<'static>,
 }
 
-unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
-    Ok((*object).name().ok_or(Error::NullName(object))?)
+pub unsafe fn _names() -> Result<(), Error> {
+    const NAMES: &str = "names.txt";
+
+    let mut dump = File::create(NAMES).map(BufWriter::new)?;
+
+    info!("Dumping to {}", NAMES);
+
+    for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
+        
+        if let Some(text) = (*name).text() {
+            writeln!(&mut dump, "[{}] {}", i, text)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub unsafe fn _objects() -> Result<(), Error> {
+    const OBJECTS: &str = "objects.txt";
+
+    let mut dump = File::create(OBJECTS).map(BufWriter::new)?;
+
+    info!("Dumping to {}", OBJECTS);
+
+    for object in (*GLOBAL_OBJECTS).iter() {
+        let address = object as usize;
+        let object = &*object;
+        
+        if let Some(name) = object.full_name() {
+            writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub unsafe fn sdk() -> Result<(), Error> {
+    let mut modules: Modules = Modules::new();
+
+    let constant: *const Struct = (*GLOBAL_OBJECTS)
+        .find("Class Core.Const")
+        .map(|o| o.cast())
+        .ok_or(Error::StaticClassNotFound("Class Core.Const"))?;
+
+    for object in (*GLOBAL_OBJECTS).iter() {
+        if (*object).is(constant) {
+            process_constant(&mut modules, object)?;
+        }
+    }
+
+    write_sdk(modules)?;
+
+    Ok(())
+}
+
+unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
+    let [module, submodule] = get_module_and_submodule(object)?;
+
+    let submodule = modules
+        .entry(name(module)?)
+        .or_default()
+        .submodules
+        .entry(name(submodule)?)
+        .or_default();
+
+    submodule.constants.push(make_constant(object)?);
+
+    Ok(())
 }
 
 unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Object; 2], Error> {
@@ -117,6 +147,10 @@ unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Obje
     let submodule = submodule.ok_or(Error::OutersIsFewerThanTwo(object))?;
 
     Ok([module, submodule])
+}
+
+unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
+    Ok((*object).name().ok_or(Error::NullName(object))?)
 }
 
 unsafe fn make_constant(object: *const Object) -> Result<Constant, Error> {
@@ -145,58 +179,6 @@ unsafe fn make_constant(object: *const Object) -> Result<Constant, Error> {
     })
 }
 
-unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
-    let [module, submodule] = get_module_and_submodule(object)?;
-
-    let submodule = modules
-        .entry(name(module)?)
-        .or_default()
-        .submodules
-        .entry(name(submodule)?)
-        .or_default();
-
-    submodule.constants.push(make_constant(object)?);
-
-    Ok(())
-}
-
-fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
-    if let Err(e) = fs::create_dir(&path) {
-        if e.kind() != ErrorKind::AlreadyExists {
-            return Err(Error::UnableToCreateDir(path.as_ref().to_path_buf()));
-        }
-    }
-    
-    Ok(())
-}
-
-unsafe fn write_constants(path: &mut PathBuf, constants: &Vec<Constant>) -> Result<(), Error> {
-    const CONSTANTS: &str = "constants.txt";
-    
-    path.push(CONSTANTS);
-    let mut f = File::create(&path).map(BufWriter::new)?;
-    path.pop();
-
-    for constant in constants {
-        writeln!(&mut f, "{} = {}", constant.name, constant.value)?;
-    }
-
-    Ok(())
-}
-
-unsafe fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
-    for (submodule_name, submodule) in submodules {
-        path.push(submodule_name);
-        create_dir(&path)?;
-
-        write_constants(path, &submodule.constants)?;
-        
-        path.pop();
-    }
-
-    Ok(())
-}
-
 unsafe fn write_sdk(modules: Modules) -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
 
@@ -215,21 +197,54 @@ unsafe fn write_sdk(modules: Modules) -> Result<(), Error> {
     Ok(())
 }
 
-pub unsafe fn sdk() -> Result<(), Error> {
-    let mut modules: Modules = Modules::new();
-
-    let constant: *const Struct = (*GLOBAL_OBJECTS)
-        .find("Class Core.Const")
-        .map(|o| o.cast())
-        .ok_or(Error::StaticClassNotFound("Class Core.Const"))?;
-
-    for object in (*GLOBAL_OBJECTS).iter() {
-        if (*object).is(constant) {
-            process_constant(&mut modules, object)?;
+fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
+    if let Err(e) = fs::create_dir(&path) {
+        if e.kind() != ErrorKind::AlreadyExists {
+            return Err(Error::UnableToCreateDir(path.as_ref().to_path_buf()));
         }
     }
+    
+    Ok(())
+}
 
-    write_sdk(modules)?;
+unsafe fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
+    for (submodule_name, submodule) in submodules {
+        path.push(submodule_name);
+        create_dir(&path)?;
+
+        write_constants(path, &submodule.constants)?;
+        write_enumerations(path, &submodule.enumerations)?;
+
+        path.pop();
+    }
+
+    Ok(())
+}
+
+unsafe fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Error> {
+    const CONSTANTS: &str = "constants.txt";
+    
+    path.push(CONSTANTS);
+    let mut f = File::create(&path).map(BufWriter::new)?;
+    path.pop();
+
+    for constant in constants {
+        writeln!(&mut f, "{} = {}", constant.name, constant.value)?;
+    }
+
+    Ok(())
+}
+
+unsafe fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Result<(), Error> {
+    const ENUMERATIONS: &str = "enums.rs";
+    
+    path.push(ENUMERATIONS);
+    let mut f = File::create(&path).map(BufWriter::new)?;
+    path.pop();
+
+    for enumeration in enumerations {
+        
+    }
 
     Ok(())
 }
