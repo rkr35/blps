@@ -67,6 +67,18 @@ pub struct NameIndex {
     number: u32,
 }
 
+impl NameIndex {
+    pub unsafe fn name(&self) -> Option<&str> {
+        let name = *(*GLOBAL_NAMES).get(self.index as usize)?;
+
+        if name.is_null() {
+            None
+        } else {
+            (*name).text()
+        }
+    }
+}
+
 #[repr(C)]
 pub struct Object {
     vtable: usize,
@@ -104,14 +116,8 @@ impl Object {
     }
 
     pub unsafe fn name(&self) -> Option<&str> {
-        let name = *(*GLOBAL_NAMES).get(self.name.index as usize)?;
-
-        if name.is_null() {
-            None
-        } else {
-            (*name).text()
+        self.name.name()
         }
-    }
 
     pub unsafe fn is(&self, class: *const Struct) -> bool {
         self.iter_class().any(|c| ptr::eq(c, class))
