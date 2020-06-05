@@ -239,10 +239,10 @@ unsafe fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -
     const ENUMERATIONS: &str = "enums.rs";
     
     path.push(ENUMERATIONS);
-    let mut f = File::create(&path).map(BufWriter::new)?;
+    let _f = File::create(&path).map(BufWriter::new)?;
     path.pop();
 
-    for enumeration in enumerations {
+    for _enumeration in enumerations {
         
     }
 
