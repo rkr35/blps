@@ -102,22 +102,29 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
+    let constant = find_static_class("Class Core.Const")?;
+    let enumeration = find_static_class("Class Core.Enum")?;
+    
     let mut modules: Modules = Modules::new();
-
-    let constant: *const Struct = (*GLOBAL_OBJECTS)
-        .find("Class Core.Const")
-        .map(|o| o.cast())
-        .ok_or(Error::StaticClassNotFound("Class Core.Const"))?;
 
     for object in (*GLOBAL_OBJECTS).iter() {
         if (*object).is(constant) {
             process_constant(&mut modules, object)?;
+        } else if (*object).is(enumeration) {
+            process_enumeration(&mut modules, object)?;
         }
     }
 
     write_sdk(modules)?;
 
     Ok(())
+}
+
+unsafe fn find_static_class(class: &'static str) -> Result<*const Struct, Error> {
+    Ok((*GLOBAL_OBJECTS)
+            .find(class)
+            .map(|o| o.cast())
+            .ok_or(Error::StaticClassNotFound(class))?)
 }
 
 unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
@@ -132,6 +139,10 @@ unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Resu
 
     submodule.constants.push(make_constant(object)?);
 
+    Ok(())
+}
+
+unsafe fn process_enumeration(_modules: &mut Modules, _object: *const Object) -> Result<(), Error> {
     Ok(())
 }
 
