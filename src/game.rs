@@ -117,7 +117,7 @@ impl Object {
 
     pub unsafe fn name(&self) -> Option<&str> {
         self.name.name()
-        }
+    }
 
     pub unsafe fn is(&self, class: *const Struct) -> bool {
         self.iter_class().any(|c| ptr::eq(c, class))
@@ -191,6 +191,35 @@ impl Deref for Const {
 }
 
 impl DerefMut for Const {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.field
+    }
+}
+
+#[repr(C)]
+pub struct Enum {
+    field: Field,
+    variants: Array<NameIndex>,
+}
+
+impl Enum {
+    pub unsafe fn variants(&self) -> Option<Vec<&str>> {
+        self.variants
+            .iter()
+            .map(|n| n.name())
+            .collect()
+    }
+}
+
+impl Deref for Enum {
+    type Target = Field;
+
+    fn deref(&self) -> &Self::Target {
+        &self.field
+    }
+}
+
+impl DerefMut for Enum {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.field
     }
