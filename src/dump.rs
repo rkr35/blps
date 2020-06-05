@@ -40,8 +40,44 @@ struct Constant {
     value: String,
 }
 
+impl Constant {
+    pub unsafe fn from(object: *const Object) -> Result<Self, Error> {
+        let value = {
+            // Cast so we can access fields of constant.
+            let object: *const Const = object.cast();
+    
+            // Construct a printable string.
+            let value: OsString = (*object).value.to_string();
+            let mut value: String = value.into_string().map_err(Error::StringConversion)?;
+            
+            // The strings in memory are C strings, so they have null terminators that
+            // Rust strings don't care for.
+            // Get rid of that null-terminator so we don't see a funky '?' in the human-
+            // readable output.
+            if value.ends_with(char::from(0)) {
+                value.pop();
+            }
+    
+            value
+        };
+    
+        Ok(Self {
+            name: name(object)?,
+            value,
+        })
+    }
+}
+
 #[derive(Debug)]
 struct Enumeration {
+    name: &'static str,
+    variants: Vec<&'static str>,
+}
+
+impl Enumeration {
+    pub unsafe fn from(object: *const Object) -> Result<Self, Error> {
+        todo!();
+    }
 }
 
 #[derive(Debug)]
@@ -128,22 +164,28 @@ unsafe fn find_static_class(class: &'static str) -> Result<*const Struct, Error>
 }
 
 unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
+    get_submodule(modules, object)?
+        .constants
+        .push(Constant::from(object)?);
+    Ok(())
+}
+
+unsafe fn process_enumeration(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
+    get_submodule(modules, object)?
+        .enumerations
+        .push(Enumeration::from(object)?);
+    Ok(())
+}
+
+unsafe fn get_submodule<'a>(modules: &'a mut Modules, object: *const Object) -> Result<&'a mut Submodule, Error> {
     let [module, submodule] = get_module_and_submodule(object)?;
 
-    let submodule = modules
+    Ok(modules
         .entry(name(module)?)
         .or_default()
         .submodules
         .entry(name(submodule)?)
-        .or_default();
-
-    submodule.constants.push(make_constant(object)?);
-
-    Ok(())
-}
-
-unsafe fn process_enumeration(_modules: &mut Modules, _object: *const Object) -> Result<(), Error> {
-    Ok(())
+        .or_default())
 }
 
 unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Object; 2], Error> {
@@ -162,32 +204,6 @@ unsafe fn get_module_and_submodule(object: *const Object) -> Result<[*const Obje
 
 unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
     Ok((*object).name().ok_or(Error::NullName(object))?)
-}
-
-unsafe fn make_constant(object: *const Object) -> Result<Constant, Error> {
-    let value = {
-        // Cast so we can access fields of constant.
-        let object: *const Const = object.cast();
-
-        // Construct a printable string.
-        let value: OsString = (*object).value.to_string();
-        let mut value: String = value.into_string().map_err(Error::StringConversion)?;
-        
-        // The strings in memory are C strings, so they have null terminators that
-        // Rust strings don't care for.
-        // Get rid of that null-terminator so we don't see a funky '?' in the human-
-        // readable output.
-        if value.ends_with(char::from(0)) {
-            value.pop();
-        }
-
-        value
-    };
-
-    Ok(Constant {
-        name: name(object)?,
-        value,
-    })
 }
 
 fn write_sdk(modules: Modules) -> Result<(), Error> {
