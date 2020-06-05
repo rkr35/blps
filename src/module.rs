@@ -45,6 +45,7 @@ pub struct Module {
 }
 
 impl Module {
+    /// Construct a module from its PE name, e.g., "notepad.exe".
     pub fn from(name: &str) -> Result<Module, Error> {
         let (module, info) = unsafe {
             let module = Module::get_handle(name)?;
@@ -110,6 +111,11 @@ impl Module {
         self._find_bytes(string.as_bytes())
     }
 
+    /// Find the first address in this module that matches `pattern`.
+    ///
+    /// Each byte in `pattern` can be `Some(u8)` or `None`, where the former
+    /// looks for exactly the specified byte, and the latter is a wildcard byte
+    /// that matches any byte.
     pub fn find_pattern(&self, pattern: &[Option<u8>]) -> Option<usize> {
         let memory = unsafe {
             let base = self.base as *const u8;
