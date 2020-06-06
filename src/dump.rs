@@ -145,9 +145,9 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     for object in (*GLOBAL_OBJECTS).iter() {
         if (*object).is(constant) {
-            process_constant(&mut modules, object)?;
+            get_submodule(&mut modules, object)?.constants.push(Constant::from(object)?);
         } else if (*object).is(enumeration) {
-            process_enumeration(&mut modules, object)?;
+            get_submodule(&mut modules, object)?.enumerations.push(Enumeration::from(object)?);
         }
     }
 
@@ -161,20 +161,6 @@ unsafe fn find_static_class(class: &'static str) -> Result<*const Struct, Error>
             .find(class)
             .map(|o| o.cast())
             .ok_or(Error::StaticClassNotFound(class))?)
-}
-
-unsafe fn process_constant(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
-    get_submodule(modules, object)?
-        .constants
-        .push(Constant::from(object)?);
-    Ok(())
-}
-
-unsafe fn process_enumeration(modules: &mut Modules, object: *const Object) -> Result<(), Error> {
-    get_submodule(modules, object)?
-        .enumerations
-        .push(Enumeration::from(object)?);
-    Ok(())
 }
 
 unsafe fn get_submodule<'a>(modules: &'a mut Modules, object: *const Object) -> Result<&'a mut Submodule, Error> {
