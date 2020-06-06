@@ -1,16 +1,25 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{Const, Enum, Object, Struct};
+use crate::game::{BoolProperty, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, ErrorKind, Write};
+use std::iter;
+use std::mem;
 use std::path::{Path, PathBuf};
+use std::ptr;
 
 use codegen::{Scope};
 use log::info;
 use thiserror::Error;
+use typed_builder::TypedBuilder;
+
+static mut CONSTANT: *const Class = ptr::null();
+static mut ENUMERATION: *const Class = ptr::null();
+static mut STRUCTURE: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -92,11 +101,104 @@ impl Enumeration {
 }
 
 #[derive(Debug)]
-struct Structure {
+enum MemberKind {
+    Padding,
+}
+
+#[derive(Debug, TypedBuilder)]
+struct Member {
+    kind: MemberKind,
+    offset: u32,
+    size: u32,
+
+    #[builder(default, setter(strip_option))]
+    comment: Option<&'static str>,
+}
+
+impl Member {
+    pub fn from(p: &Property) -> Result<Self, Error> {
+        let b = Member::builder();
+        todo!()
+    }
 }
 
 #[derive(Debug)]
-struct Class {
+struct Structure {
+    name: &'static str,
+    size: usize,
+    inherited_size: usize,
+    members: Vec<Member>,
+}
+
+impl Structure {
+    pub unsafe fn from(object: *const Object) -> Result<Self, Error> {
+        static mut FUNCTION: *const Class = ptr::null();
+        static mut BOOL_PROPERTY: *const Class = ptr::null();
+
+        if FUNCTION.is_null() {
+            FUNCTION = find_static_class("Class Core.Function")?;
+        }
+
+        if BOOL_PROPERTY.is_null() {
+            BOOL_PROPERTY = find_static_class("Class Core.BoolProperty")?;
+        }
+        
+        let name = name(object)?;
+        let structure: *const Struct = object.cast();
+        let size = usize::from((*structure).property_size);
+        let super_class: *const Struct = (*structure).super_field.cast();
+
+        let mut offset = 0;
+        let mut inherited_size = 0;
+
+        if !super_class.is_null() && !std::ptr::eq(super_class, structure) {
+            inherited_size = u32::from((*super_class).property_size);
+            offset = inherited_size;
+        }
+
+        let properties = iter::successors(
+            (*structure).children.cast::<Property>().as_ref(),
+            |property| property.next.cast::<Property>().as_ref()
+        );
+
+        let mut properties: Vec<&Property> = properties
+            .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
+            .collect();
+
+        properties.sort_unstable_by(|p, q| 
+            p.offset.cmp(&q.offset).then_with(||
+                if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
+                    let p = mem::transmute::<&Property, &BoolProperty>(p);
+                    let q = mem::transmute::<&Property, &BoolProperty>(q);
+                    p.bitmask.cmp(&q.bitmask)
+                } else {
+                    Ordering::Equal
+                }
+            )
+        );
+
+        let mut previous_bitfield: Option<()> = None;
+        let mut members = vec![];
+
+        for property in properties {
+            if offset < property.offset {
+                previous_bitfield = None;
+                members.push(
+                    Member::builder()
+                        .kind(MemberKind::Padding)
+                        .offset(offset)
+                        .size(property.offset - offset)
+                        .comment("Missed offset. Likely alignment padding.")
+                );
+            }
+        }
+
+        todo!();
+    }
+}
+
+#[derive(Debug)]
+struct ModuleClass {
 }
 
 #[derive(Debug, Default)]
@@ -108,7 +210,7 @@ struct Submodule {
 
 #[derive(Debug, Default)]
 struct Module {
-    classes: Vec<Class>,
+    classes: Vec<ModuleClass>,
     submodules: Submodules<'static>,
 }
 
@@ -121,7 +223,7 @@ pub unsafe fn names() -> Result<(), Error> {
     info!("Dumping global names {:?} to {}", GLOBAL_NAMES, NAMES);
 
     writeln!(&mut dump, "Global names is at {:?}", GLOBAL_NAMES)?;
-        
+
     for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
         if let Some(text) = (*name).text() {
             writeln!(&mut dump, "[{}] {}", i, text)?;
@@ -156,16 +258,19 @@ pub unsafe fn objects() -> Result<(), Error> {
 pub unsafe fn sdk() -> Result<(), Error> {
     let _time = TimeIt::new("sdk()");
 
-    let constant = find_static_class("Class Core.Const")?;
-    let enumeration = find_static_class("Class Core.Enum")?;
+    CONSTANT = find_static_class("Class Core.Const")?;
+    ENUMERATION = find_static_class("Class Core.Enum")?;
+    STRUCTURE = find_static_class("Class Core.ScriptStruct")?;
     
     let mut modules: Modules = Modules::new();
 
     for object in (*GLOBAL_OBJECTS).iter() {
-        if (*object).is(constant) {
+        if (*object).is(CONSTANT) {
             get_submodule(&mut modules, object)?.constants.push(Constant::from(object)?);
-        } else if (*object).is(enumeration) {
+        } else if (*object).is(ENUMERATION) {
             get_submodule(&mut modules, object)?.enumerations.push(Enumeration::from(object)?);
+        } else if (*object).is(STRUCTURE) {
+            get_submodule(&mut modules, object)?.structures.push(Structure::from(object)?);
         }
     }
 
@@ -174,7 +279,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
     Ok(())
 }
 
-unsafe fn find_static_class(class: &'static str) -> Result<*const Struct, Error> {
+unsafe fn find_static_class(class: &'static str) -> Result<*const Class, Error> {
     Ok((*GLOBAL_OBJECTS)
             .find(class)
             .map(|o| o.cast())

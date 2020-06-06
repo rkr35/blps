@@ -88,7 +88,7 @@ pub struct Object {
     pub pad1: [u8; 0x4],
     pub outer: *mut Object,
     pub name: NameIndex,
-    pub class: *mut Struct,
+    pub class: *mut Class,
     pub archetype: *mut Object,
 }
 
@@ -112,17 +112,17 @@ impl Object {
         iter::successors(Some(self), |current| current.outer.as_ref())
     }
 
-    pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Struct> {
+    pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Class> {
         iter::successors(self.class.as_ref(), |current| current.super_field
             .as_ref()
-            .map(|field| mem::transmute::<&Field, &Struct>(field)))
+            .map(|field| mem::transmute::<&Field, &Class>(field)))
     }
 
     pub unsafe fn name(&self) -> Option<&str> {
         self.name.name()
     }
 
-    pub unsafe fn is(&self, class: *const Struct) -> bool {
+    pub unsafe fn is(&self, class: *const Class) -> bool {
         self.iter_class().any(|c| ptr::eq(c, class))
     }
 }
