@@ -88,7 +88,7 @@ pub struct Object {
     pub outer: *mut Object,
     name: NameIndex,
     class: *mut Struct,
-    pad2: [u8; 0x4],
+    archetype: *mut Object,
 }
 
 impl Object {
