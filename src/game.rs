@@ -341,3 +341,23 @@ impl DerefMut for Property {
         &mut self.field
     }
 }
+
+#[repr(C)]
+pub struct ByteProperty {
+    pub property: Property,
+    pub enumeration: *mut Enum,
+}
+
+impl Deref for ByteProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for ByteProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
