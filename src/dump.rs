@@ -112,15 +112,17 @@ struct Module {
     submodules: Submodules<'static>,
 }
 
-pub unsafe fn _names() -> Result<(), Error> {
+pub unsafe fn names() -> Result<(), Error> {
     const NAMES: &str = "names.txt";
+    let _time = TimeIt::new("dump global names");
 
     let mut dump = File::create(NAMES).map(BufWriter::new)?;
 
-    info!("Dumping to {}", NAMES);
+    info!("Dumping global names {:?} to {}", GLOBAL_NAMES, NAMES);
 
-    for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
+    writeln!(&mut dump, "Global names is at {:?}", GLOBAL_NAMES)?;
         
+    for (i, name) in (*GLOBAL_NAMES).iter().enumerate() {
         if let Some(text) = (*name).text() {
             writeln!(&mut dump, "[{}] {}", i, text)?;
         }
@@ -129,12 +131,15 @@ pub unsafe fn _names() -> Result<(), Error> {
     Ok(())
 }
 
-pub unsafe fn _objects() -> Result<(), Error> {
+pub unsafe fn objects() -> Result<(), Error> {
     const OBJECTS: &str = "objects.txt";
+    let _time = TimeIt::new("dump global objects");
 
     let mut dump = File::create(OBJECTS).map(BufWriter::new)?;
 
-    info!("Dumping to {}", OBJECTS);
+    info!("Dumping global objects {:?} to {}", GLOBAL_OBJECTS, OBJECTS);
+
+    writeln!(&mut dump, "Global objects is at {:?}", GLOBAL_OBJECTS)?;
 
     for object in (*GLOBAL_OBJECTS).iter() {
         let address = object as usize;
