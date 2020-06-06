@@ -29,6 +29,9 @@ mod macros;
 mod module;
 use module::Module;
 
+mod timeit;
+use timeit::TimeIt;
+
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 
@@ -54,6 +57,8 @@ enum Error {
 }
 
 unsafe fn find_globals() -> Result<(), Error> {
+    let _time = TimeIt::new("find globals");
+
     let game = Module::from("BorderlandsPreSequel.exe")?;
     
     let names_pattern = [
@@ -93,6 +98,8 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
     } else {
         info!("Initialized logger.");
 
+        let _time = TimeIt::new("run()");
+        
         if let Err(e) = run() {
             error!("{}", e);
         }

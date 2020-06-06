@@ -1,5 +1,6 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use crate::game::{Const, Enum, Object, Struct};
+use crate::TimeIt;
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -148,6 +149,8 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
+    let _time = TimeIt::new("sdk()");
+
     let constant = find_static_class("Class Core.Const")?;
     let enumeration = find_static_class("Class Core.Enum")?;
     
