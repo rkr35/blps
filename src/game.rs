@@ -2,6 +2,7 @@ use crate::GLOBAL_NAMES;
 
 use std::ffi::{CStr, OsString, c_void};
 use std::iter;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
 use std::os::windows::ffi::OsStringExt;
@@ -112,7 +113,9 @@ impl Object {
     }
 
     pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Struct> {
-        iter::successors(self.class.as_ref(), |current| current.super_field.as_ref())
+        iter::successors(self.class.as_ref(), |current| current.super_field
+            .as_ref()
+            .map(|field| mem::transmute::<&Field, &Struct>(field)))
     }
 
     pub unsafe fn name(&self) -> Option<&str> {
