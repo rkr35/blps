@@ -257,7 +257,7 @@ pub struct Function {
     params_size: u16,
     return_value_offset: u16,
     pad0: [u8; 6],
-    func: Option<&'static c_void>,
+    func: *mut c_void,
     pad1: [u8; 4],
 }
 
@@ -324,7 +324,7 @@ pub struct Property {
     property_size: u16,
     pad0: [u8; 14],
     offset: u32,
-    property_link_next: Option<&'static Property>,
+    property_link_next: *mut Property,
     pad1: [u8; 12],
 }
 
