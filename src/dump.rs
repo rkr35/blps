@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{Const, Object, Struct};
+use crate::game::{Const, Enum, Object, Struct};
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -7,6 +7,7 @@ use std::fs::{self, File};
 use std::io::{self, BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
+use codegen::{Scope};
 use log::info;
 use thiserror::Error;
 
@@ -29,6 +30,9 @@ pub enum Error {
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
+
+    #[error("failed to get variants of the enum {0:?}")]
+    Variants(*const Enum),
 }
 
 type Modules<'a> = HashMap<&'a str, Module>;
@@ -76,7 +80,13 @@ struct Enumeration {
 
 impl Enumeration {
     pub unsafe fn from(object: *const Object) -> Result<Self, Error> {
-        todo!();
+        let name = name(object)?;
+        let object: *const Enum = object.cast();
+
+        Ok(Self {
+            name,
+            variants: (*object).variants().ok_or(Error::Variants(object))?,
+        })
     }
 }
 
@@ -252,12 +262,20 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
     const ENUMERATIONS: &str = "enums.rs";
     
     path.push(ENUMERATIONS);
-    let _f = File::create(&path).map(BufWriter::new)?;
+    let mut f = File::create(&path).map(BufWriter::new)?;
     path.pop();
 
-    for _enumeration in enumerations {
-        
+    let mut scope = Scope::new();
+
+    for Enumeration { name, variants } in enumerations {
+        let e = scope.new_enum(name).repr("u8");
+
+        for variant in variants {
+            e.new_variant(variant);
+        }
     }
+
+    writeln!(&mut f, "{}", scope.to_string())?;
 
     Ok(())
 }
