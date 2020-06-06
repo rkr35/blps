@@ -224,3 +224,24 @@ impl DerefMut for Enum {
         &mut self.field
     }
 }
+
+#[repr(C)]
+pub struct ScriptStruct {
+    struct_base: Struct,
+    pad0: [u8; 28],
+}
+
+impl Deref for ScriptStruct {
+    type Target = Struct;
+
+    fn deref(&self) -> &Self::Target {
+        &self.struct_base
+    }
+}
+
+impl DerefMut for ScriptStruct {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.struct_base
+    }
+}
+
