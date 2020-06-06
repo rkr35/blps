@@ -503,3 +503,23 @@ impl DerefMut for MapProperty {
     }
 }
 
+#[repr(C)]
+pub struct DelegateProperty {
+    pub property: Property,
+    pub function1: *mut Function,
+    pub function2: *mut Function,
+}
+
+impl Deref for DelegateProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for DelegateProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
