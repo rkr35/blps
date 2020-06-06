@@ -381,3 +381,23 @@ impl DerefMut for BoolProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct ObjectProperty {
+    pub property: Property,
+    pub property_class: *mut Class,
+}
+
+impl Deref for ObjectProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for ObjectProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
