@@ -274,3 +274,23 @@ impl DerefMut for Function {
         &mut self.struct_base
     }
 }
+
+#[repr(C)]
+pub struct State {
+    struct_base: Struct,
+    pad0: [u8; 68],
+}
+
+impl Deref for State {
+    type Target = Struct;
+
+    fn deref(&self) -> &Self::Target {
+        &self.struct_base
+    }
+}
+
+impl DerefMut for State {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.struct_base
+    }
+}
