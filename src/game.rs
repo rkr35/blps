@@ -461,3 +461,23 @@ impl DerefMut for StructProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct ArrayProperty {
+    pub property: Property,
+    pub inner: *mut Property,
+}
+
+impl Deref for ArrayProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for ArrayProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
