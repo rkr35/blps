@@ -361,3 +361,23 @@ impl DerefMut for ByteProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct BoolProperty {
+    pub property: Property,
+    pub bitmask: u32,
+}
+
+impl Deref for BoolProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for BoolProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
