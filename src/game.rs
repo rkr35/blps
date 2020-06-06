@@ -148,10 +148,10 @@ impl DerefMut for Field {
 pub struct Struct {
     field: Field,
     pad0: [u8; 8],
-    pub super_field: *mut Struct,
+    pub super_field: *mut Field,
     pub children: *mut Field,
     pub property_size: u16,
-    pad1: [u8; 0x3a],
+    pad1: [u8; 0x2e],
 }
 
 impl Deref for Struct {
