@@ -314,3 +314,30 @@ impl DerefMut for Class {
         &mut self.struct_base
     }
 }
+
+#[repr(C)]
+pub struct Property {
+    pub field: Field,
+    array_dim: u32,
+    element_size: u32,
+    property_flags: u64,
+    property_size: u16,
+    pad0: [u8; 14],
+    offset: u32,
+    property_link_next: Option<&'static Property>,
+    pad1: [u8; 12],
+}
+
+impl Deref for Property {
+    type Target = Field;
+
+    fn deref(&self) -> &Self::Target {
+        &self.field
+    }
+}
+
+impl DerefMut for Property {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.field
+    }
+}
