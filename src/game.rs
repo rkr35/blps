@@ -401,3 +401,24 @@ impl DerefMut for ObjectProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct ClassProperty {
+    pub object_property: ObjectProperty,
+    pub meta_class: *mut Class,
+}
+
+impl Deref for ClassProperty {
+    type Target = ObjectProperty;
+
+    fn deref(&self) -> &Self::Target {
+        &self.object_property
+    }
+}
+
+impl DerefMut for ClassProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.object_property
+    }
+}
+
