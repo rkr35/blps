@@ -1,6 +1,6 @@
 use crate::GLOBAL_NAMES;
 
-use std::ffi::{CStr, OsString};
+use std::ffi::{CStr, OsString, c_void};
 use std::iter;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
@@ -245,3 +245,32 @@ impl DerefMut for ScriptStruct {
     }
 }
 
+#[repr(C)]
+pub struct Function {
+    struct_base: Struct,
+    flags: u32,
+    native: u16,
+    rep_offset: u16,
+    name_index: NameIndex,
+    precedence: u8,
+    num_params: u8,
+    params_size: u16,
+    return_value_offset: u16,
+    pad0: [u8; 6],
+    func: Option<&'static c_void>,
+    pad1: [u8; 4],
+}
+
+impl Deref for Function {
+    type Target = Struct;
+
+    fn deref(&self) -> &Self::Target {
+        &self.struct_base
+    }
+}
+
+impl DerefMut for Function {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.struct_base
+    }
+}
