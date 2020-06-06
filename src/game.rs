@@ -481,3 +481,25 @@ impl DerefMut for ArrayProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct MapProperty {
+    pub property: Property,
+    pub key: *mut Property,
+    pub value: *mut Property,
+}
+
+impl Deref for MapProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for MapProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
+
