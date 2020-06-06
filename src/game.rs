@@ -23,9 +23,9 @@ impl Objects {
 
 #[repr(C)]
 pub struct Array<T> {
-    data: *mut T,
-    count: u32,
-    max: u32,
+    pub data: *mut T,
+    pub count: u32,
+    pub max: u32,
 }
 
 impl<T> Deref for Array<T> {
@@ -52,8 +52,8 @@ impl<T> Array<*mut T> {
 
 #[repr(C)]
 pub struct Name {
-    pad0: [u8; 0x10],
-    text: c_char,
+    pub pad0: [u8; 0x10],
+    pub text: c_char,
 }
 
 impl Name {
@@ -64,8 +64,8 @@ impl Name {
 
 #[repr(C)]
 pub struct NameIndex {
-    index: u32,
-    number: u32,
+    pub index: u32,
+    pub number: u32,
 }
 
 impl NameIndex {
@@ -82,14 +82,14 @@ impl NameIndex {
 
 #[repr(C)]
 pub struct Object {
-    vtable: usize,
-    pad0: [u8; 0x1c],
+    pub vtable: usize,
+    pub pad0: [u8; 0x1c],
     pub index: u32,
-    pad1: [u8; 0x4],
+    pub pad1: [u8; 0x4],
     pub outer: *mut Object,
-    name: NameIndex,
-    class: *mut Struct,
-    archetype: *mut Object,
+    pub name: NameIndex,
+    pub class: *mut Struct,
+    pub archetype: *mut Object,
 }
 
 impl Object {
@@ -129,7 +129,7 @@ impl Object {
 
 #[repr(C)]
 pub struct Field {
-    object: Object,
+    pub object: Object,
     pub next: *mut Field,
 }
 
@@ -149,12 +149,12 @@ impl DerefMut for Field {
 
 #[repr(C)]
 pub struct Struct {
-    field: Field,
-    pad0: [u8; 8],
+    pub field: Field,
+    pub pad0: [u8; 8],
     pub super_field: *mut Field,
     pub children: *mut Field,
     pub property_size: u16,
-    pad1: [u8; 0x2e],
+    pub pad1: [u8; 0x2e],
 }
 
 impl Deref for Struct {
@@ -201,8 +201,8 @@ impl DerefMut for Const {
 
 #[repr(C)]
 pub struct Enum {
-    field: Field,
-    variants: Array<NameIndex>,
+    pub field: Field,
+    pub variants: Array<NameIndex>,
 }
 
 impl Enum {
@@ -230,8 +230,8 @@ impl DerefMut for Enum {
 
 #[repr(C)]
 pub struct ScriptStruct {
-    struct_base: Struct,
-    pad0: [u8; 28],
+    pub struct_base: Struct,
+    pub pad0: [u8; 28],
 }
 
 impl Deref for ScriptStruct {
@@ -250,18 +250,18 @@ impl DerefMut for ScriptStruct {
 
 #[repr(C)]
 pub struct Function {
-    struct_base: Struct,
-    flags: u32,
-    native: u16,
-    rep_offset: u16,
-    name_index: NameIndex,
-    precedence: u8,
-    num_params: u8,
-    params_size: u16,
-    return_value_offset: u16,
-    pad0: [u8; 6],
-    func: *mut c_void,
-    pad1: [u8; 4],
+    pub struct_base: Struct,
+    pub flags: u32,
+    pub native: u16,
+    pub rep_offset: u16,
+    pub name_index: NameIndex,
+    pub precedence: u8,
+    pub num_params: u8,
+    pub params_size: u16,
+    pub return_value_offset: u16,
+    pub pad0: [u8; 6],
+    pub func: *mut c_void,
+    pub pad1: [u8; 4],
 }
 
 impl Deref for Function {
@@ -280,8 +280,8 @@ impl DerefMut for Function {
 
 #[repr(C)]
 pub struct State {
-    struct_base: Struct,
-    pad0: [u8; 68],
+    pub struct_base: Struct,
+    pub pad0: [u8; 68],
 }
 
 impl Deref for State {
@@ -300,8 +300,8 @@ impl DerefMut for State {
 
 #[repr(C)]
 pub struct Class {
-    struct_base: Struct,
-    pad0: [u8; 268],
+    pub struct_base: Struct,
+    pub pad0: [u8; 268],
 }
 
 impl Deref for Class {
@@ -321,14 +321,14 @@ impl DerefMut for Class {
 #[repr(C)]
 pub struct Property {
     pub field: Field,
-    array_dim: u32,
-    element_size: u32,
-    property_flags: u64,
-    property_size: u16,
-    pad0: [u8; 14],
-    offset: u32,
-    property_link_next: *mut Property,
-    pad1: [u8; 12],
+    pub array_dim: u32,
+    pub element_size: u32,
+    pub property_flags: u64,
+    pub property_size: u16,
+    pub pad0: [u8; 14],
+    pub offset: u32,
+    pub property_link_next: *mut Property,
+    pub pad1: [u8; 12],
 }
 
 impl Deref for Property {
