@@ -422,3 +422,22 @@ impl DerefMut for ClassProperty {
     }
 }
 
+#[repr(C)]
+pub struct InterfaceProperty {
+    pub property: Property,
+    pub interface_class: *mut Class,
+}
+
+impl Deref for InterfaceProperty {
+    type Target = Property;
+
+    fn deref(&self) -> &Self::Target {
+        &self.property
+    }
+}
+
+impl DerefMut for InterfaceProperty {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.property
+    }
+}
