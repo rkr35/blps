@@ -393,6 +393,9 @@ fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), E
 }
 
 fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Error> {
+    if constants.is_empty() {
+        return Ok(());
+    }
     path.push("constants.txt");
     let mut f = File::create(&path).map(BufWriter::new)?;
     path.pop();
@@ -405,9 +408,9 @@ fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Err
 }
 
 fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Result<(), Error> {
-    path.push("enums.rs");
-    let mut f = File::create(&path).map(BufWriter::new)?;
-    path.pop();
+    if enumerations.is_empty() {
+        return Ok(());
+    }
 
     let mut scope = Scope::new();
 
