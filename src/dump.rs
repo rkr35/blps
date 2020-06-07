@@ -451,7 +451,14 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
         }
     }
 
-    writeln!(&mut f, "{}", scope.to_string())?;
+    let names: Vec<&str> = enumerations
+        .iter()
+        .map(|e| e.name)
+        .collect();
+
+    let import_names = format!("pub use enums::{{{}}};", names.join(", "));
+
+    module.scope.raw(&import_names);
 
     Ok(())
 }
