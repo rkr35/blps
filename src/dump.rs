@@ -424,6 +424,7 @@ fn write_constants(path: &mut PathBuf, constants: &[Constant]) -> Result<(), Err
     if constants.is_empty() {
         return Ok(());
     }
+
     path.push("constants.txt");
     let mut f = File::create(&path).map(BufWriter::new)?;
     path.pop();
