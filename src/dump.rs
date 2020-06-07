@@ -411,7 +411,12 @@ fn create_dir<P: AsRef<Path>>(path: P) -> Result<(), Error> {
 }
 
 fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), Error> {
+    let mut module = StagingFile::from(path, "mod.rs")?;
+
     for (submodule_name, submodule) in submodules {
+        let import = format!("pub use {};", submodule_name);
+        module.scope.raw(&import);
+
         path.push(submodule_name);
         create_dir(&path)?;
 
