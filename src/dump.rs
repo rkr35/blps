@@ -54,6 +54,32 @@ pub enum Error {
 type Modules<'a> = HashMap<&'a str, Module>;
 type Submodules<'a> = HashMap<&'a str, Submodule>;
 
+struct StagingFile {
+    pub file: BufWriter<File>,
+    pub scope: Scope,
+}
+
+impl StagingFile {
+    pub fn from(path: &mut PathBuf, file: &str) -> Result<Self, Error> {
+        path.push(file);
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map(BufWriter::new)?;
+        path.pop();
+
+        Ok(Self { file, scope: Scope::new() })
+    }
+}
+
+impl Drop for StagingFile {
+    fn drop(&mut self) {
+        writeln!(&mut self.file, "{}", self.scope.to_string())
+            .expect("flushing StagingFile");
+    }
+}
+
 #[derive(Debug)]
 struct Constant {
     name: &'static str,
@@ -414,10 +440,11 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
         return Ok(());
     }
 
-    let mut scope = Scope::new();
+    let mut module = StagingFile::from(path, "mod.rs")?;
+    let mut enum_file = StagingFile::from(path, "enums.rs")?;
 
     for Enumeration { name, variants } in enumerations {
-        let e = scope.new_enum(name).repr("u8");
+        let e = enum_file.scope.new_enum(name).repr("u8");
 
         for variant in variants {
             e.new_variant(variant);
@@ -430,8 +457,7 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
 }
 
 fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), Error> {
-    let mut mod_rs = open_mod_rs(path)?;
-    let mut mod_rs_scope = Scope::new();
+    let mut module = StagingFile::from(path, "mod.rs")?;
 
     for s in structures {
         let import = format!(
@@ -440,15 +466,12 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
             name = s.name
         );
 
-        mod_rs_scope.raw(&import);
+        module.scope.raw(&import);
 
-        path.push(format!("{}.rs", s.name));
-        let mut struct_rs = File::create(&path).map(BufWriter::new)?;
-        path.pop();
+        let mut struct_file = StagingFile::from(path, &format!("{}.rs", s.name))?;
 
-        let mut struct_scope = Scope::new();
-
-        let struct_gen = struct_scope
+        let struct_gen = struct_file
+            .scope
             .new_struct(s.name)
             .vis("pub")
             .repr("C");
@@ -465,22 +488,7 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
 
             struct_gen.field(&name, ty.as_ref());
         }
-
-        writeln!(&mut struct_rs, "{}", struct_scope.to_string())?;
     }
 
-    writeln!(&mut mod_rs, "{}", mod_rs_scope.to_string())?;
-
     Ok(())
-}
-
-fn open_mod_rs(path: &mut PathBuf) -> Result<BufWriter<File>, Error> {
-    path.push("mod.rs");
-    let mod_rs = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .map(BufWriter::new)?;
-    path.pop();
-    Ok(mod_rs)
 }
