@@ -352,6 +352,8 @@ unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
 fn write_sdk(modules: Modules) -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
 
+    let _ = fs::remove_dir_all(SDK_PATH);
+
     let mut path = PathBuf::from(SDK_PATH);
     create_dir(&path)?;
 
