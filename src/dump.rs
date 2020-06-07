@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, ErrorKind, Write};
 use std::iter;
 use std::mem;
@@ -429,10 +429,7 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
 }
 
 fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), Error> {
-    path.push("mod.rs");
-    let mut mod_rs = File::create(&path).map(BufWriter::new)?;
-    path.pop();
-
+    let mut mod_rs = open_mod_rs(path)?;
     let mut mod_rs_scope = Scope::new();
 
     for s in structures {
@@ -474,4 +471,15 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
     writeln!(&mut mod_rs, "{}", mod_rs_scope.to_string())?;
 
     Ok(())
+}
+
+fn open_mod_rs(path: &mut PathBuf) -> Result<BufWriter<File>, Error> {
+    path.push("mod.rs");
+    let mod_rs = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map(BufWriter::new)?;
+    path.pop();
+    Ok(mod_rs)
 }
