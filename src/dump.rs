@@ -2,6 +2,7 @@ use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use crate::game::{BoolProperty, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -20,6 +21,8 @@ use typed_builder::TypedBuilder;
 static mut CONSTANT: *const Class = ptr::null();
 static mut ENUMERATION: *const Class = ptr::null();
 static mut STRUCTURE: *const Class = ptr::null();
+static mut BYTE_PROPERTY: *const Class = ptr::null();
+static mut BOOL_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -43,6 +46,9 @@ pub enum Error {
 
     #[error("failed to get variants of the enum {0:?}")]
     Variants(*const Enum),
+
+    #[error("unknown property type for {0:?}")]
+    UnknownProperty(*const Property),
 }
 
 type Modules<'a> = HashMap<&'a str, Module>;
@@ -103,10 +109,14 @@ impl Enumeration {
 #[derive(Debug)]
 enum MemberKind {
     Padding,
+    Byte,
+    Bool,
+    Unknown,
 }
 
 #[derive(Debug, TypedBuilder)]
 struct Member {
+    name: String,
     kind: MemberKind,
     offset: u32,
     size: u32,
@@ -115,10 +125,23 @@ struct Member {
     comment: Option<&'static str>,
 }
 
-impl Member {
-    pub fn from(p: &Property) -> Result<Self, Error> {
-        let b = Member::builder();
-        todo!()
+struct PropertyInfo {
+    kind: MemberKind,
+    size: usize,
+}
+
+impl PropertyInfo {
+    pub unsafe fn from(p: &Property) -> Result<Self, Error> {
+        let (kind, size) = if p.is(BYTE_PROPERTY) {
+            (MemberKind::Byte, mem::size_of::<u8>())
+        } else if p.is(BOOL_PROPERTY) {
+            (MemberKind::Bool, mem::size_of::<u32>())
+        } else {
+            (MemberKind::Unknown, 0)
+            // return Err(Error::UnknownProperty(p as *const Property));
+        };
+
+        Ok(Self { kind, size })
     }
 }
 
@@ -133,17 +156,11 @@ struct Structure {
 impl Structure {
     pub unsafe fn from(object: *const Object) -> Result<Self, Error> {
         static mut FUNCTION: *const Class = ptr::null();
-        static mut BOOL_PROPERTY: *const Class = ptr::null();
 
         if FUNCTION.is_null() {
             FUNCTION = find_static_class("Class Core.Function")?;
         }
 
-        if BOOL_PROPERTY.is_null() {
-            BOOL_PROPERTY = find_static_class("Class Core.BoolProperty")?;
-        }
-        
-        let name = name(object)?;
         let structure: *const Struct = object.cast();
         let size = usize::from((*structure).property_size);
         let super_class: *const Struct = (*structure).super_field.cast();
@@ -185,15 +202,30 @@ impl Structure {
                 previous_bitfield = None;
                 members.push(
                     Member::builder()
+                        .name(format!("pad_at_{:#X}", offset))
                         .kind(MemberKind::Padding)
                         .offset(offset)
                         .size(property.offset - offset)
                         .comment("Missed offset. Likely alignment padding.")
+                        .build()
                 );
             }
+
+            let PropertyInfo { kind, size } = PropertyInfo::from(property)?;
+            members.push(Member::builder()
+                .name(name(property as &Object)?.to_string())
+                .kind(kind)
+                .offset(offset)
+                .size(size as u32)
+                .build());
         }
 
-        todo!();
+        Ok(Self {
+            name: name(object)?,
+            size,
+            inherited_size: inherited_size as usize,
+            members,
+        })
     }
 }
 
@@ -261,7 +293,9 @@ pub unsafe fn sdk() -> Result<(), Error> {
     CONSTANT = find_static_class("Class Core.Const")?;
     ENUMERATION = find_static_class("Class Core.Enum")?;
     STRUCTURE = find_static_class("Class Core.ScriptStruct")?;
-    
+    BYTE_PROPERTY = find_static_class("Class Core.ByteProperty")?;
+    BOOL_PROPERTY = find_static_class("Class Core.BoolProperty")?;
+
     let mut modules: Modules = Modules::new();
 
     for object in (*GLOBAL_OBJECTS).iter() {
@@ -350,6 +384,7 @@ fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), E
 
         write_constants(path, &submodule.constants)?;
         write_enumerations(path, &submodule.enumerations)?;
+        write_structures(path, &submodule.structures)?;
 
         path.pop();
     }
@@ -389,6 +424,54 @@ fn write_enumerations(path: &mut PathBuf, enumerations: &[Enumeration]) -> Resul
     }
 
     writeln!(&mut f, "{}", scope.to_string())?;
+
+    Ok(())
+}
+
+fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), Error> {
+    path.push("mod.rs");
+    let mut mod_rs = File::create(&path).map(BufWriter::new)?;
+    path.pop();
+
+    let mut mod_rs_scope = Scope::new();
+
+    for s in structures {
+        let import = format!(
+            "mod {name};\n\
+            pub use {name}::{name};",
+            name = s.name
+        );
+
+        mod_rs_scope.raw(&import);
+
+        path.push(format!("{}.rs", s.name));
+        let mut struct_rs = File::create(&path).map(BufWriter::new)?;
+        path.pop();
+
+        let mut struct_scope = Scope::new();
+
+        let struct_gen = struct_scope
+            .new_struct(s.name)
+            .vis("pub")
+            .repr("C");
+
+        for member in &s.members {
+            // pub Name: Type,
+            let name = format!("pub {}", member.name);
+            let ty: Cow<str> = match member.kind {
+                MemberKind::Padding => format!("[u8; {}]", member.size).into(),
+                MemberKind::Byte => "u8".into(),
+                MemberKind::Bool => "u32".into(),
+                MemberKind::Unknown => format!("UNK_{}", member.size).into(),
+            };
+
+            struct_gen.field(&name, ty.as_ref());
+        }
+
+        writeln!(&mut struct_rs, "{}", struct_scope.to_string())?;
+    }
+
+    writeln!(&mut mod_rs, "{}", mod_rs_scope.to_string())?;
 
     Ok(())
 }
