@@ -383,11 +383,16 @@ fn write_sdk(modules: Modules) -> Result<(), Error> {
     let mut path = PathBuf::from(SDK_PATH);
     create_dir(&path)?;
 
+    let mut module_file = StagingFile::from(&mut path, "mod.rs")?;
+
     for (module_name, module) in modules {
         path.push(module_name);
         create_dir(&path)?;
-
+        
         write_submodules(&mut path, &module.submodules)?;
+        
+        let import = format!("pub mod {};", module_name);
+        module_file.scope.raw(&import);
 
         path.pop();
     }
