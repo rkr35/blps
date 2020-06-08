@@ -174,6 +174,7 @@ impl PropertyInfo {
 #[derive(Debug)]
 struct Structure {
     name: &'static str,
+    super_class: *const Struct,
     size: usize,
     inherited_size: usize,
     members: Vec<Member>,
@@ -248,6 +249,7 @@ impl Structure {
 
         Ok(Self {
             name: name(object)?,
+            super_class,
             size,
             inherited_size: inherited_size as usize,
             members,
