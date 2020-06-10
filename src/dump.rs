@@ -541,11 +541,23 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
             deref_impl
                 .impl_trait("Deref")
                 .associate_type("Target", unsafe { get_full_path(s.super_class.cast())? });
-
+                
             deref_impl.new_fn("deref")
                 .arg_ref_self()
                 .ret("&Self::Target")
                 .line("&self.base");
+
+            struct_file.scope.push_impl(deref_impl);
+
+            let mut deref_impl = Impl::new(s.name);
+
+            deref_impl
+                .impl_trait("DerefMut");
+                
+            deref_impl.new_fn("deref_mut")
+                .arg_mut_self()
+                .ret("&mut Self::Target")
+                .line("&mut self.base");
 
             struct_file.scope.push_impl(deref_impl);
         }
