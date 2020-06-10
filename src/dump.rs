@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, Class, Const, Enum, Object, Property, Struct};
+use crate::game::{BoolProperty, ByteProperty, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -135,7 +135,7 @@ impl Enumeration {
 #[derive(Debug)]
 enum MemberKind {
     Padding,
-    Byte,
+    Byte(*mut Enum),
     Bool,
     Unknown,
 }
@@ -159,7 +159,8 @@ struct PropertyInfo {
 impl PropertyInfo {
     pub unsafe fn from(p: &Property) -> Result<Self, Error> {
         let (kind, size) = if p.is(BYTE_PROPERTY) {
-            (MemberKind::Byte, mem::size_of::<u8>())
+            let p = mem::transmute::<&Property, &ByteProperty>(p);
+            (MemberKind::Byte(p.enumeration), mem::size_of::<u8>())
         } else if p.is(BOOL_PROPERTY) {
             (MemberKind::Bool, mem::size_of::<u32>())
         } else {
@@ -377,6 +378,14 @@ unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
     Ok((*object).name().ok_or(Error::NullName(object))?)
 }
 
+unsafe fn get_full_path(object: *const Object) -> Result<String, Error> {
+    let [module, submodule] = get_module_and_submodule(object)?;
+    let module = name(module)?;
+    let submodule = name(submodule)?;
+    let object = name(object)?;
+    Ok(format!("sdk::{}::{}::{}", module, submodule, object))
+}
+
 fn write_sdk(modules: Modules) -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk";
 
@@ -490,6 +499,8 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
 
         let mut struct_file = StagingFile::from(path, &format!("{}.rs", s.name))?;
 
+        struct_file.scope.import("crate", "sdk");
+
         let struct_gen = struct_file
             .scope
             .new_struct(s.name)
@@ -497,11 +508,14 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
             .repr("C");
 
         for member in &s.members {
-            // pub Name: Type,
             let name = format!("pub {}", member.name);
             let ty: Cow<str> = match member.kind {
                 MemberKind::Padding => format!("[u8; {}]", member.size).into(),
-                MemberKind::Byte => "u8".into(),
+                MemberKind::Byte(enumeration) => if enumeration.is_null() {
+                    "u8".into()
+                } else {
+                    unsafe { get_full_path(enumeration.cast())?.into() }
+                }
                 MemberKind::Bool => "u32".into(),
                 MemberKind::Unknown => format!("UNK_{}", member.size).into(),
             };
