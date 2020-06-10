@@ -13,7 +13,7 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
-use codegen::{Scope};
+use codegen::{Impl, Scope};
 use log::info;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -137,6 +137,7 @@ enum MemberKind {
     Padding,
     Byte(*mut Enum),
     Bool,
+    Struct(*const Struct),
     Unknown,
 }
 
@@ -195,10 +196,17 @@ impl Structure {
 
         let mut offset = 0;
         let mut inherited_size = 0;
+        let mut members = vec![];
 
         if !super_class.is_null() && !std::ptr::eq(super_class, structure) {
             inherited_size = u32::from((*super_class).property_size);
             offset = inherited_size;
+            members.push(Member::builder()
+                .name("base".to_string())
+                .kind(MemberKind::Struct(super_class))
+                .offset(0)
+                .size(inherited_size)
+                .build());
         }
 
         let properties = iter::successors(
@@ -223,7 +231,6 @@ impl Structure {
         );
 
         let mut previous_bitfield: Option<()> = None;
-        let mut members = vec![];
 
         for property in properties {
             if offset < property.offset {
@@ -501,6 +508,10 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
 
         struct_file.scope.import("crate", "sdk");
 
+        if !s.super_class.is_null() {
+            struct_file.scope.raw("use std::ops::{Deref, DerefMut};");
+        }
+
         let struct_gen = struct_file
             .scope
             .new_struct(s.name)
@@ -517,10 +528,26 @@ fn write_structures(path: &mut PathBuf, structures: &[Structure]) -> Result<(), 
                     unsafe { get_full_path(enumeration.cast())?.into() }
                 }
                 MemberKind::Bool => "u32".into(),
+                MemberKind::Struct(structure) => unsafe { get_full_path(structure.cast())?.into() },
                 MemberKind::Unknown => format!("UNK_{}", member.size).into(),
             };
 
             struct_gen.field(&name, ty.as_ref());
+        }
+
+        if !s.super_class.is_null() {
+            let mut deref_impl = Impl::new(s.name);
+
+            deref_impl
+                .impl_trait("Deref")
+                .associate_type("Target", unsafe { get_full_path(s.super_class.cast())? });
+
+            deref_impl.new_fn("deref")
+                .arg_ref_self()
+                .ret("&Self::Target")
+                .line("&self.base");
+
+            struct_file.scope.push_impl(deref_impl);
         }
     }
 
