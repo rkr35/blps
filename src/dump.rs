@@ -432,7 +432,7 @@ fn write_submodules(path: &mut PathBuf, submodules: &Submodules) -> Result<(), E
     let mut module = StagingFile::from(path, "mod.rs")?;
 
     for (submodule_name, submodule) in submodules {
-        let import = format!("pub use {};", submodule_name);
+        let import = format!("pub mod {};", submodule_name);
         module.scope.raw(&import);
 
         path.push(submodule_name);
