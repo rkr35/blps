@@ -1,4 +1,4 @@
 /target
 Cargo.lock
-src/sdk/
 .vs
+src/sdk.rs
