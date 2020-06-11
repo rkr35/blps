@@ -288,7 +288,7 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let e = sdk.new_enum(name(object)?).repr("u8");
+    let e = sdk.new_enum(name(object)?).repr("u8").vis("pub");
 
     let object: *const Enum = object.cast();
 
