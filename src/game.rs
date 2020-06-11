@@ -206,11 +206,10 @@ pub struct Enum {
 }
 
 impl Enum {
-    pub unsafe fn variants(&self) -> Option<Vec<&str>> {
+    pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
         self.variants
             .iter()
             .map(|n| n.name())
-            .collect()
     }
 }
 
