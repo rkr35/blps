@@ -234,8 +234,8 @@ pub unsafe fn sdk() -> Result<(), Error> {
 }
 
 fn add_crate_attributes(scope: &mut Scope) {
-    scope.raw("#![allow(dead_code)]");
-    scope.raw("#![allow(non_camel_case_types)]");
+    scope.raw("#![allow(dead_code)]\n\
+               #![allow(non_camel_case_types)]");
 }
 
 unsafe fn find_static_classes() -> Result<(), Error> {
