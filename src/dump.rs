@@ -10,7 +10,7 @@ use std::iter;
 use std::mem;
 use std::ptr;
 
-use codegen::{Impl, Scope};
+use codegen::{Impl, Scope, Struct as StructGen};
 use log::{info, warn};
 use thiserror::Error;
 
@@ -257,7 +257,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         Some(super_name)
     };
 
-    let properties = get_properties(structure);
+    add_fields(struct_gen, get_properties(structure))?;
 
     if let Some(super_class) = super_class {
         add_deref_impls(sdk, name, super_class);
@@ -266,23 +266,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     Ok(())
 }
 
-fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
-    sdk
-        .new_impl(derived_name)
-        .impl_trait("Deref")
-        .associate_type("Target", base_name)
-        .new_fn("deref")
-        .arg_ref_self()
-        .ret("&Self::Target")
-        .line("&self.base");
-
-    sdk
-        .new_impl(derived_name)
-        .impl_trait("DerefMut")
-        .new_fn("deref_mut")
-        .arg_mut_self()
-        .ret("&mut Self::Target")
-        .line("&mut self.base");
+unsafe fn add_fields(struct_gen: &mut StructGen, properties: Vec<&Property>) -> Result<(), Error> {
+    Ok(())
 }
 
 unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
@@ -308,6 +293,25 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     );
 
     properties
+}
+
+fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
+    sdk
+        .new_impl(derived_name)
+        .impl_trait("Deref")
+        .associate_type("Target", base_name)
+        .new_fn("deref")
+        .arg_ref_self()
+        .ret("&Self::Target")
+        .line("&self.base");
+
+    sdk
+        .new_impl(derived_name)
+        .impl_trait("DerefMut")
+        .new_fn("deref_mut")
+        .arg_mut_self()
+        .ret("&mut Self::Target")
+        .line("&mut self.base");
 }
 
 unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
