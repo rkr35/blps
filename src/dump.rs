@@ -222,6 +222,8 @@ pub unsafe fn sdk() -> Result<(), Error> {
     let mut sdk = File::create(SDK_PATH).map(BufWriter::new)?;
     let mut scope = Scope::new();
 
+    add_crate_attributes(&mut scope);
+
     for object in (*GLOBAL_OBJECTS).iter() {
         write_object(&mut scope, object)?;
     }
@@ -229,6 +231,10 @@ pub unsafe fn sdk() -> Result<(), Error> {
     writeln!(&mut sdk, "{}", scope.to_string())?;
 
     Ok(())
+}
+
+fn add_crate_attributes(scope: &mut Scope) {
+    scope.raw("#![allow(non_camel_case_types)]");
 }
 
 unsafe fn find_static_classes() -> Result<(), Error> {
