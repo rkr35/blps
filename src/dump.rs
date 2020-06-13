@@ -90,7 +90,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     find_static_classes()?;
 
-    let mut sdk = File::create(SDK_PATH).map(BufWriter::new)?;
+    let mut sdk = File::create(SDK_PATH)?;
     let mut scope = Scope::new();
 
     add_crate_attributes(&mut scope);
