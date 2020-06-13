@@ -304,8 +304,37 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let object: *const Enum = object.cast();
 
+    let mut previous: Option<&str> = None;
+    let mut count = 0;
+
     for variant in (*object).variants() {
-        e.new_variant(variant.ok_or(Error::BadVariant(object))?);
+        let variant = variant.ok_or(Error::BadVariant(object))?;
+
+        if let Some(prev) = previous {
+            if prev == variant {
+                e.new_variant(&format!("{}_{}", prev, count));
+                count += 1;
+            } else {
+                if count > 0 {
+                    e.new_variant(&format!("{}_{}", prev, count));
+                } else {
+                    e.new_variant(prev);
+                }
+                previous = Some(variant);
+                count = 0;
+            }
+        } else {
+            previous = Some(variant);
+            count = 0;
+        }
+    }
+
+    if let Some(previous) = previous {
+        if count > 0 {
+            e.new_variant(&format!("{}_{}", previous, count));
+        } else {
+            e.new_variant(previous);
+        }
     }
 
     Ok(())
