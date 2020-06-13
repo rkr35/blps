@@ -10,7 +10,7 @@ use std::iter;
 use std::mem;
 use std::ptr;
 
-use codegen::{Scope};
+use codegen::{Impl, Scope};
 use log::{info, warn};
 use thiserror::Error;
 
@@ -94,6 +94,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
     let mut scope = Scope::new();
 
     add_crate_attributes(&mut scope);
+    add_imports(&mut scope);
 
     for object in (*GLOBAL_OBJECTS).iter() {
         write_object(&mut scope, object)?;
@@ -107,6 +108,10 @@ pub unsafe fn sdk() -> Result<(), Error> {
 fn add_crate_attributes(scope: &mut Scope) {
     scope.raw("#![allow(dead_code)]\n\
                #![allow(non_camel_case_types)]");
+}
+
+fn add_imports(scope: &mut Scope) {
+    scope.raw("use std::ops::{Deref, DerefMut};");
 }
 
 unsafe fn find_static_classes() -> Result<(), Error> {
@@ -160,7 +165,7 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
         value
     };
 
-    sdk.raw(&format!("// {} = {}", name(object)?, value));
+    sdk.raw(&format!("// {} = {}", get_name(object)?, value));
     Ok(())
 }
 
@@ -170,7 +175,7 @@ fn is_enum_duplicate(name: &str) -> bool {
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = name(object)?;
+    let name = get_name(object)?;
 
     if name.starts_with("Default__") {
         return Ok(());
@@ -227,32 +232,74 @@ fn is_struct_duplicate(name: &str) -> bool {
 }
 
 unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = name(object)?;
+    let name = get_name(object)?;
 
     if is_struct_duplicate(name) {
         warn!("Ignoring {} because multiple structs have this name.", name);
         return Ok(());
     }
 
+    let structure: *const Struct = object.cast();
+    let mut offset = 0;
+    let super_class: *const Struct = (*structure).super_field.cast();
     let mut struct_gen = sdk
         .new_struct(name)
         .repr("C")
         .vis("pub");
 
-    let structure: *const Struct = object.cast();
-
-    let mut offset = 0;
-
-    let super_class: *const Struct = (*structure).super_field.cast();
-
-    if !super_class.is_null() && !ptr::eq(super_class, structure) {
+    let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
+        None
+    } else {
         offset = (*super_class).property_size;
-    }
+
+        let super_name = get_name(super_class.cast())?;
+        struct_gen.field("base", super_name);
+        Some(super_name)
+    };
 
     let properties = get_properties(structure);
+
+    if let Some(super_class) = super_class {
+        add_deref_impls(sdk, name, super_class);
+    }
     
     Ok(())
 }
+
+fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
+    sdk
+        .new_impl(derived_name)
+        .impl_trait("Deref")
+        .associate_type("Target", base_name)
+        .new_fn("deref")
+        .arg_ref_self()
+        .ret("&Self::Target")
+        .line("&self.base");
+
+    sdk
+        .new_impl(derived_name)
+        .impl_trait("DerefMut")
+        .new_fn("deref_mut")
+        .arg_mut_self()
+        .ret("&mut Self::Target")
+        .line("&mut self.base");
+}
+
+/*
+impl Deref for Derived {
+    type Target = Base;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl DerefMut for Derived {
+    fn deref(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+*/
 
 unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     let properties = iter::successors(
@@ -279,6 +326,6 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     properties
 }
 
-unsafe fn name(object: *const Object) -> Result<&'static str, Error> {
+unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
     Ok((*object).name().ok_or(Error::NullName(object))?)
 }
