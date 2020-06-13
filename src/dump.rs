@@ -311,7 +311,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
         return Ok(());
     }
 
-    let e = sdk.new_enum(name).repr("u8").vis("pub");
+    let enum_gen = sdk.new_enum(name).repr("u8").vis("pub");
 
     let object: *const Enum = object.cast();
 
@@ -323,13 +323,13 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
         if let Some(prev) = previous {
             if prev == variant {
-                e.new_variant(&format!("{}_{}", prev, count));
+                enum_gen.new_variant(&format!("{}_{}", prev, count));
                 count += 1;
             } else {
                 if count > 0 {
-                    e.new_variant(&format!("{}_{}", prev, count));
+                    enum_gen.new_variant(&format!("{}_{}", prev, count));
                 } else {
-                    e.new_variant(prev);
+                    enum_gen.new_variant(prev);
                 }
                 previous = Some(variant);
                 count = 0;
@@ -342,10 +342,13 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     if let Some(previous) = previous {
         if count > 0 {
-            e.new_variant(&format!("{}_{}", previous, count));
+            enum_gen.new_variant(&format!("{}_{}", previous, count));
         } else {
-            e.new_variant(previous);
+            enum_gen.new_variant(previous);
         }
+        }
+
+    Ok(())
     }
 
     Ok(())
