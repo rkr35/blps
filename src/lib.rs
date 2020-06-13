@@ -32,6 +32,9 @@ use module::Module;
 mod timeit;
 use timeit::TimeIt;
 
+#[cfg(feature = "include_sdk")]
+mod sdk;
+
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 
@@ -83,8 +86,8 @@ unsafe fn find_globals() -> Result<(), Error> {
 
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    dump::names()?;
-    dump::objects()?;
+    // dump::names()?;
+    // dump::objects()?;
     dump::sdk()?;
     Ok(())
 }

@@ -1,5 +1,4 @@
 /target
 Cargo.lock
-src/sdk/
-.vs/ProjectSettings.json
-.vs/slnx.sqlite
+.vs
+src/sdk.rs

@@ -14,17 +14,18 @@ incremental = false
 lto = "fat"
 panic = "abort"
 
+[features]
+include_sdk = []
+
 [dependencies]
 codegen = "0.1.3"
 log = "0.4"
 simplelog = "0.7"
 thiserror = "1.0"
-typed-builder = "0.6"
 wchar = "0.6"
 winapi = { version = "0.3", features = [
     "consoleapi",
     "libloaderapi",
-    "memoryapi", # not used
     "minwindef",
     "processthreadsapi",
     "psapi",
