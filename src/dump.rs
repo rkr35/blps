@@ -12,7 +12,7 @@ use std::mem;
 use std::ptr;
 
 use codegen::{Impl, Scope};
-use log::info;
+use log::{info, warn};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -234,6 +234,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
 }
 
 fn add_crate_attributes(scope: &mut Scope) {
+    scope.raw("#![allow(dead_code)]");
     scope.raw("#![allow(non_camel_case_types)]");
 }
 
@@ -293,10 +294,20 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
     Ok(())
 }
 
+fn is_enum_duplicate(name: &str) -> bool {
+    const DUPLICATES: [&str; 2] = ["ECompareObjectOutputLinkIds", "EFlightMode"];
+    DUPLICATES.iter().any(|dup| name == *dup)
+}
+
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     let name = name(object)?;
 
     if name.starts_with("Default__") {
+        return Ok(());
+    }
+
+    if is_enum_duplicate(name) {
+        warn!("Ignoring {} because multiple enums have this name.", name);
         return Ok(());
     }
 
