@@ -23,23 +23,23 @@ static mut BOOL_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("enum {0:?} has an unknown or ill-formed variant")]
+    BadVariant(*const Enum),
+
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 
-    #[error("unable to find static class for \"{0}\"")]
-    StaticClassNotFound(&'static str),
-
     #[error("null name for {0:?}")]
     NullName(*const Object),
+
+    #[error("unable to find static class for \"{0}\"")]
+    StaticClassNotFound(&'static str),
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
 
     // #[error("unknown property type for {0:?}")]
     // UnknownProperty(*const Property),
-
-    #[error("enum {0:?} has an unknown or ill-formed variant")]
-    BadVariant(*const Enum),
 }
 
 pub unsafe fn _names() -> Result<(), Error> {
@@ -105,6 +105,27 @@ pub unsafe fn sdk() -> Result<(), Error> {
     Ok(())
 }
 
+unsafe fn find_static_classes() -> Result<(), Error> {
+    unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
+        Ok((*GLOBAL_OBJECTS)
+                .find(class)
+                .map(|o| o.cast())
+                .ok_or(Error::StaticClassNotFound(class))?)
+    }
+    
+    let _time = TimeIt::new("find static classes");
+
+    CONSTANT = find("Class Core.Const")?;
+    ENUMERATION = find("Class Core.Enum")?;
+    STRUCTURE = find("Class Core.ScriptStruct")?;
+    FUNCTION = find("Class Core.Function")?;
+    BYTE_PROPERTY = find("Class Core.ByteProperty")?;
+    BOOL_PROPERTY = find("Class Core.BoolProperty")?;
+
+    Ok(())
+}
+
+
 fn add_crate_attributes(scope: &mut Scope) {
     scope.raw("#![allow(dead_code)]\n\
                #![allow(non_camel_case_types)]");
@@ -112,26 +133,6 @@ fn add_crate_attributes(scope: &mut Scope) {
 
 fn add_imports(scope: &mut Scope) {
     scope.raw("use std::ops::{Deref, DerefMut};");
-}
-
-unsafe fn find_static_classes() -> Result<(), Error> {
-    let _time = TimeIt::new("find static classes");
-
-    CONSTANT = find_static_class("Class Core.Const")?;
-    ENUMERATION = find_static_class("Class Core.Enum")?;
-    STRUCTURE = find_static_class("Class Core.ScriptStruct")?;
-    FUNCTION = find_static_class("Class Core.Function")?;
-    BYTE_PROPERTY = find_static_class("Class Core.ByteProperty")?;
-    BOOL_PROPERTY = find_static_class("Class Core.BoolProperty")?;
-
-    Ok(())
-}
-
-unsafe fn find_static_class(class: &'static str) -> Result<*const Class, Error> {
-    Ok((*GLOBAL_OBJECTS)
-            .find(class)
-            .map(|o| o.cast())
-            .ok_or(Error::StaticClassNotFound(class))?)
 }
 
 unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
@@ -169,9 +170,8 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
     Ok(())
 }
 
-fn is_enum_duplicate(name: &str) -> bool {
-    const DUPLICATES: [&str; 2] = ["ECompareObjectOutputLinkIds", "EFlightMode"];
-    DUPLICATES.iter().any(|dup| name == *dup)
+unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
+    Ok((*object).name().ok_or(Error::NullName(object))?)
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
@@ -226,8 +226,8 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
     Ok(())
 }
 
-fn is_struct_duplicate(name: &str) -> bool {
-    const DUPLICATES: [&str; 3] = ["CheckpointRecord", "TerrainWeightedMaterial", "ProjectileBehaviorSequenceStateData"];
+fn is_enum_duplicate(name: &str) -> bool {
+    const DUPLICATES: [&str; 2] = ["ECompareObjectOutputLinkIds", "EFlightMode"];
     DUPLICATES.iter().any(|dup| name == *dup)
 }
 
@@ -266,8 +266,9 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     Ok(())
 }
 
-unsafe fn add_fields(struct_gen: &mut StructGen, properties: Vec<&Property>) -> Result<(), Error> {
-    Ok(())
+fn is_struct_duplicate(name: &str) -> bool {
+    const DUPLICATES: [&str; 3] = ["CheckpointRecord", "TerrainWeightedMaterial", "ProjectileBehaviorSequenceStateData"];
+    DUPLICATES.iter().any(|dup| name == *dup)
 }
 
 unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
@@ -295,6 +296,10 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     properties
 }
 
+unsafe fn add_fields(struct_gen: &mut StructGen, properties: Vec<&Property>) -> Result<(), Error> {
+    Ok(())
+}
+
 fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
     sdk
         .new_impl(derived_name)
@@ -312,8 +317,4 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .arg_mut_self()
         .ret("&mut Self::Target")
         .line("&mut self.base");
-}
-
-unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
-    Ok((*object).name().ok_or(Error::NullName(object))?)
 }
