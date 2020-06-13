@@ -285,22 +285,6 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .line("&mut self.base");
 }
 
-/*
-impl Deref for Derived {
-    type Target = Base;
-
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl DerefMut for Derived {
-    fn deref(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
-*/
-
 unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     let properties = iter::successors(
         (*structure).children.cast::<Property>().as_ref(),
