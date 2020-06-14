@@ -18,8 +18,12 @@ static mut CONSTANT: *const Class = ptr::null();
 static mut ENUMERATION: *const Class = ptr::null();
 static mut STRUCTURE: *const Class = ptr::null();
 static mut FUNCTION: *const Class = ptr::null();
-static mut BYTE_PROPERTY: *const Class = ptr::null();
+
 static mut BOOL_PROPERTY: *const Class = ptr::null();
+static mut BYTE_PROPERTY: *const Class = ptr::null();
+static mut FLOAT_PROPERTY: *const Class = ptr::null();
+static mut INT_PROPERTY: *const Class = ptr::null();
+static mut OBJECT_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -119,8 +123,12 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     ENUMERATION = find("Class Core.Enum")?;
     STRUCTURE = find("Class Core.ScriptStruct")?;
     FUNCTION = find("Class Core.Function")?;
-    BYTE_PROPERTY = find("Class Core.ByteProperty")?;
+    
     BOOL_PROPERTY = find("Class Core.BoolProperty")?;
+    BYTE_PROPERTY = find("Class Core.ByteProperty")?;
+    FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
+    INT_PROPERTY = find("Class Core.IntProperty")?;
+    OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
 
     Ok(())
 }
