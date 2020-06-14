@@ -10,7 +10,7 @@ use std::iter;
 use std::mem;
 use std::ptr;
 
-use codegen::{Impl, Scope, Struct as StructGen};
+use codegen::{Scope, Struct as StructGen};
 use log::{info, warn};
 use thiserror::Error;
 
