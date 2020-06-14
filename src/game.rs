@@ -428,7 +428,7 @@ impl DerefMut for ClassProperty {
 #[repr(C)]
 pub struct InterfaceProperty {
     pub property: Property,
-    pub interface_class: *mut Class,
+    pub class: *mut Class,
 }
 
 impl Deref for InterfaceProperty {
@@ -443,6 +443,12 @@ impl DerefMut for InterfaceProperty {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.property
     }
+}
+
+#[repr(C)]
+pub struct ScriptInterface {
+    pub object: *mut Object,
+	pub interface: *mut c_void,
 }
 
 #[repr(C)]

@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, Object, ObjectProperty, Property, Struct};
+use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -26,6 +26,8 @@ static mut BYTE_PROPERTY: *const Class = ptr::null();
 static mut CLASS_PROPERTY: *const Class = ptr::null();
 static mut FLOAT_PROPERTY: *const Class = ptr::null();
 static mut INT_PROPERTY: *const Class = ptr::null();
+static mut INTERFACE_PROPERTY: *const Class = ptr::null();
+static mut NAME_PROPERTY: *const Class = ptr::null();
 static mut OBJECT_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
@@ -35,6 +37,9 @@ pub enum Error {
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
+
+    #[error("null interface class for {0:?}")]
+    NullInterfaceClass(*const InterfaceProperty),
 
     #[error("null meta class for {0:?}")]
     NullMetaClass(*const ClassProperty),
@@ -141,6 +146,8 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     CLASS_PROPERTY = find("Class Core.ClassProperty")?;
     FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
     INT_PROPERTY = find("Class Core.IntProperty")?;
+    INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
+    NAME_PROPERTY = find("Class Core.NameProperty")?;
     OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
 
     Ok(())
@@ -338,17 +345,25 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
 
         let info = PropertyInfo::try_from(property)?;
 
-        struct_gen.field(get_name({
-            let o: &Object = property;
-            o
-        })?, info.field_type.as_ref());
-
         let total_property_size = property.element_size * property.array_dim;
         let size_mismatch = total_property_size - info.size * property.array_dim;
 
         if size_mismatch > 0 {
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
         }
+
+        let field_name = {
+            let o: &Object = property;
+            format!("pub {}", get_name(o)?)
+        };
+
+        let field_type = if info.comment.is_empty() {
+            info.field_type
+        } else {
+            format!("{} // {}", info.field_type, info.comment).into()
+        };
+
+        struct_gen.field(&field_name, field_type.as_ref());
 
         *offset = property.offset + total_property_size;
     }
@@ -385,13 +400,15 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
 pub struct PropertyInfo {
     size: u32,
     field_type: Cow<'static, str>,
+    comment: &'static str,
 }
 
 impl PropertyInfo {
     fn new(size: u32, field_type: Cow<'static, str>) -> Self {
         Self { 
             size,
-            field_type
+            field_type,
+            comment: "",
         }
     }
 }
@@ -438,6 +455,18 @@ impl TryFrom<&Property> for PropertyInfo {
                 simple!(f32)
             } else if property.is(INT_PROPERTY) {
                 simple!(i32)
+            } else if property.is(INTERFACE_PROPERTY) {
+                let property: &InterfaceProperty = cast(property);
+
+                if property.class.is_null() {
+                    return Err(Error::NullInterfaceClass(property));
+                }
+
+                let mut info = simple!(ScriptInterface);
+                info.comment = get_name(property.class.cast())?;
+                info
+            } else if property.is(NAME_PROPERTY) {
+                simple!(NameIndex)
             } else if property.is(OBJECT_PROPERTY) {
                 let property: &ObjectProperty = cast(property);
                 
