@@ -298,8 +298,8 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     properties.sort_by(|p, q| 
         p.offset.cmp(&q.offset).then_with(||
             if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
-                let p = mem::transmute::<&Property, &BoolProperty>(p);
-                let q = mem::transmute::<&Property, &BoolProperty>(q);
+                let p: &BoolProperty = cast(p);
+                let q: &BoolProperty = cast(q);
                 p.bitmask.cmp(&q.bitmask)
             } else {
                 Ordering::Equal
@@ -308,6 +308,10 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     );
 
     properties
+}
+
+unsafe fn cast<To>(from: &Object) -> &To {
+    mem::transmute::<&Object, &To>(from)
 }
 
 unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
