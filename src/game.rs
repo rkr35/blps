@@ -388,7 +388,7 @@ impl DerefMut for BoolProperty {
 #[repr(C)]
 pub struct ObjectProperty {
     pub property: Property,
-    pub property_class: *mut Class,
+    pub class: *mut Class,
 }
 
 impl Deref for ObjectProperty {
