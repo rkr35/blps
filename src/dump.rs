@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, Const, Enum, Object, ObjectProperty, Property, Struct};
+use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, Object, ObjectProperty, Property, Struct};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -23,6 +23,7 @@ static mut FUNCTION: *const Class = ptr::null();
 
 static mut BOOL_PROPERTY: *const Class = ptr::null();
 static mut BYTE_PROPERTY: *const Class = ptr::null();
+static mut CLASS_PROPERTY: *const Class = ptr::null();
 static mut FLOAT_PROPERTY: *const Class = ptr::null();
 static mut INT_PROPERTY: *const Class = ptr::null();
 static mut OBJECT_PROPERTY: *const Class = ptr::null();
@@ -34,6 +35,9 @@ pub enum Error {
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
+
+    #[error("null meta class for {0:?}")]
+    NullMetaClass(*const ClassProperty),
 
     #[error("null name for {0:?}")]
     NullName(*const Object),
@@ -134,6 +138,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     
     BOOL_PROPERTY = find("Class Core.BoolProperty")?;
     BYTE_PROPERTY = find("Class Core.ByteProperty")?;
+    CLASS_PROPERTY = find("Class Core.ClassProperty")?;
     FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
     INT_PROPERTY = find("Class Core.IntProperty")?;
     OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
@@ -418,6 +423,17 @@ impl TryFrom<&Property> for PropertyInfo {
                     let typ = get_name(property.enumeration.cast())?;
                     Self::new(size_of::<u8>(), typ.into())
                 }
+            } else if property.is(CLASS_PROPERTY) {
+                let property: &ClassProperty = cast(property);
+
+                if property.meta_class.is_null() {
+                    return Err(Error::NullMetaClass(property));
+                }
+
+                let name = get_name(property.meta_class.cast())?;
+                let typ = format!("Option<&'static {}>", name);
+
+                Self::new(size_of::<usize>(), typ.into())
             } else if property.is(FLOAT_PROPERTY) {
                 simple!(f32)
             } else if property.is(INT_PROPERTY) {
