@@ -1,8 +1,10 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, Const, Enum, Object, Property, Struct};
+use crate::game::{BoolProperty, ByteProperty, Class, Const, Enum, Object, ObjectProperty, Property, Struct};
 use crate::TimeIt;
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::convert::TryFrom;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
@@ -35,6 +37,12 @@ pub enum Error {
 
     #[error("null name for {0:?}")]
     NullName(*const Object),
+
+    #[error("null property class for {0:?}")]
+    NullPropertyClass(*const ObjectProperty),
+
+    #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
+    PropertySizeMismatch(*const Property, u32, PropertyInfo),
 
     #[error("unable to find static class for \"{0}\"")]
     StaticClassNotFound(&'static str),
@@ -315,6 +323,31 @@ unsafe fn cast<To>(from: &Object) -> &To {
 }
 
 unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
+    let mut previous_bitfield: Option<&BoolProperty> = None;
+
+    for property in properties {
+        if *offset < property.offset {
+            previous_bitfield = None;
+            add_padding(struct_gen, *offset, property.offset - *offset);
+        }
+
+        let info = PropertyInfo::try_from(property)?;
+
+        struct_gen.field(get_name({
+            let o: &Object = property;
+            o
+        })?, info.field_type.as_ref());
+
+        let total_property_size = property.element_size * property.array_dim;
+        // let size_mismatch = total_property_size - info.size * property.array_dim;
+
+        // if size_mismatch > 0 {
+        //     return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
+        // }
+
+        *offset = property.offset + total_property_size;
+    }
+
     Ok(())
 }
 
@@ -341,4 +374,69 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .arg_mut_self()
         .ret("&mut Self::Target")
         .line("&mut self.base");
+}
+
+#[derive(Debug)]
+pub struct PropertyInfo {
+    size: u32,
+    field_type: Cow<'static, str>,
+}
+
+impl PropertyInfo {
+    fn new(size: u32, field_type: Cow<'static, str>) -> Self {
+        Self { 
+            size,
+            field_type
+        }
+    }
+}
+
+impl TryFrom<&Property> for PropertyInfo {
+    type Error = Error;
+
+    fn try_from(property: &Property) -> Result<Self, Self::Error> {
+        fn size_of<T>() -> u32 {
+            mem::size_of::<T>() as u32
+        }
+
+        macro_rules! simple {
+            ($typ:ty) => {
+                Self::new(size_of::<$typ>(), stringify!($typ).into())
+            }
+        }
+
+        Ok(unsafe {
+            if property.is(BOOL_PROPERTY) {
+                // not "bool" because bool properties are u32 bitfields.
+                simple!(u32) 
+            } else if property.is(BYTE_PROPERTY) {
+                let property: &ByteProperty = cast(property);
+
+                if property.enumeration.is_null() {
+                    simple!(u8)
+                } else {
+                    let typ = get_name(property.enumeration.cast())?;
+                    Self::new(size_of::<u8>(), typ.into())
+                }
+            } else if property.is(FLOAT_PROPERTY) {
+                simple!(f32)
+            } else if property.is(INT_PROPERTY) {
+                simple!(i32)
+            } else if property.is(OBJECT_PROPERTY) {
+                let property: &ObjectProperty = cast(property);
+                
+                if property.class.is_null() {
+                    return Err(Error::NullPropertyClass(property));
+                }
+
+                let name = get_name(property.class.cast())?;
+                let typ = format!("Option<&'static {}>", name);
+
+                Self::new(size_of::<usize>(), typ.into())
+            } else {
+                simple!(i8)
+                // todo!();
+            }
+        })
+    }
 }
