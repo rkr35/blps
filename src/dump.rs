@@ -339,11 +339,11 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         })?, info.field_type.as_ref());
 
         let total_property_size = property.element_size * property.array_dim;
-        // let size_mismatch = total_property_size - info.size * property.array_dim;
+        let size_mismatch = total_property_size - info.size * property.array_dim;
 
-        // if size_mismatch > 0 {
-        //     return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
-        // }
+        if size_mismatch > 0 {
+            return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
+        }
 
         *offset = property.offset + total_property_size;
     }
