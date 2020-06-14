@@ -240,7 +240,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     }
 
     let structure: *const Struct = object.cast();
-    let mut offset = 0;
+    let mut offset: u32 = 0;
     let super_class: *const Struct = (*structure).super_field.cast();
     let mut struct_gen = sdk
         .new_struct(name)
@@ -250,14 +250,20 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
         None
     } else {
-        offset = (*super_class).property_size;
+        offset = (*super_class).property_size.into();
 
         let super_name = get_name(super_class.cast())?;
         struct_gen.field("base", super_name);
         Some(super_name)
     };
 
-    add_fields(struct_gen, get_properties(structure))?;
+    add_fields(struct_gen, &mut offset, get_properties(structure))?;
+
+    let structure_size = (*structure).property_size.into();
+
+    if offset < structure_size {
+        add_padding(struct_gen, offset, structure_size - offset);
+    }
 
     if let Some(super_class) = super_class {
         add_deref_impls(sdk, name, super_class);
@@ -296,8 +302,14 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     properties
 }
 
-unsafe fn add_fields(struct_gen: &mut StructGen, properties: Vec<&Property>) -> Result<(), Error> {
+unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
     Ok(())
+}
+
+unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
+    let name = format!("pad_at_{:#x}", offset);
+    let typ = format!("[u8; {:#x}]", size);
+    struct_gen.field(&name, typ);
 }
 
 fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
