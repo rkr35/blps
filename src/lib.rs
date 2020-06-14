@@ -73,6 +73,7 @@ unsafe fn find_globals() -> Result<(), Error> {
     let global_names = (global_names + 8) as *const *const Names;
     let global_names = global_names.read_unaligned();
     GLOBAL_NAMES = global_names;
+    info!("GLOBAL_NAMES = {:?}", GLOBAL_NAMES);
 
     let objects_pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
 
@@ -80,6 +81,7 @@ unsafe fn find_globals() -> Result<(), Error> {
     let global_objects = (global_objects + 2) as *const *const Objects;
     let global_objects = global_objects.read_unaligned();
     GLOBAL_OBJECTS = global_objects;
+    info!("GLOBAL_OBJECTS = {:?}", GLOBAL_OBJECTS);
 
     Ok(())
 }
