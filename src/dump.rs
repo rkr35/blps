@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct};
+use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -29,6 +29,7 @@ static mut INT_PROPERTY: *const Class = ptr::null();
 static mut INTERFACE_PROPERTY: *const Class = ptr::null();
 static mut NAME_PROPERTY: *const Class = ptr::null();
 static mut OBJECT_PROPERTY: *const Class = ptr::null();
+static mut STRUCT_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -49,6 +50,9 @@ pub enum Error {
 
     #[error("null property class for {0:?}")]
     NullPropertyClass(*const ObjectProperty),
+
+    #[error("null property struct for {0:?}")]
+    NullPropertyStruct(*const StructProperty),
 
     #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
     PropertySizeMismatch(*const Property, u32, PropertyInfo),
@@ -149,6 +153,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
     NAME_PROPERTY = find("Class Core.NameProperty")?;
     OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
+    STRUCT_PROPERTY = find("Class Core.StructProperty")?;
 
     Ok(())
 }
@@ -347,11 +352,11 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         let info = PropertyInfo::try_from(property)?;
 
         let total_property_size = property.element_size * property.array_dim;
-        let size_mismatch = total_property_size - info.size * property.array_dim;
+        // let size_mismatch = total_property_size - info.size * property.array_dim;
 
-        if size_mismatch > 0 {
-            return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
-        }
+        // if size_mismatch > 0 {
+        //     return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
+        // }
 
         let field_name = {
             let o: &Object = property;
@@ -479,6 +484,15 @@ impl TryFrom<&Property> for PropertyInfo {
                 let typ = format!("Option<&'static {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
+            } else if property.is(STRUCT_PROPERTY) {
+                let property: &StructProperty = cast(property);
+                
+                if property.inner_struct.is_null() {
+                    return Err(Error::NullPropertyStruct(property));
+                }
+
+                let typ = get_name(property.inner_struct.cast())?;
+                Self::new(property.element_size, typ.into())
             } else {
                 simple!(i8)
                 // todo!();
