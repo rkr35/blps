@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
+use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -29,6 +29,7 @@ static mut INT_PROPERTY: *const Class = ptr::null();
 static mut INTERFACE_PROPERTY: *const Class = ptr::null();
 static mut NAME_PROPERTY: *const Class = ptr::null();
 static mut OBJECT_PROPERTY: *const Class = ptr::null();
+static mut STR_PROPERTY: *const Class = ptr::null();
 static mut STRUCT_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
@@ -153,6 +154,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
     NAME_PROPERTY = find("Class Core.NameProperty")?;
     OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
+    STR_PROPERTY = find("Class Core.StrProperty")?;
     STRUCT_PROPERTY = find("Class Core.StructProperty")?;
 
     Ok(())
@@ -493,6 +495,8 @@ impl TryFrom<&Property> for PropertyInfo {
 
                 let typ = get_name(property.inner_struct.cast())?;
                 Self::new(property.element_size, typ.into())
+            } else if property.is(STR_PROPERTY) { 
+                simple!(FString)
             } else {
                 simple!(i8)
                 // todo!();
