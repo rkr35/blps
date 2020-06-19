@@ -218,6 +218,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let object: *const Enum = object.cast();
 
+    // TODO: This implementation can probably refactored using typestates.
     let mut previous: Option<&str> = None;
     let mut count = 0;
 
