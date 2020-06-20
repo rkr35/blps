@@ -342,7 +342,7 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
 unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
     let mut previous_bitfield: Option<&BoolProperty> = None;
 
-    let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut counts: HashMap<&str, usize> = HashMap::with_capacity(properties.len());
 
     for property in properties {
         if *offset < property.offset {
