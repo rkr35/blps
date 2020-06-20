@@ -372,11 +372,15 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
             }
         };
 
-        let field_type = if info.comment.is_empty() {
+        let mut field_type = if info.comment.is_empty() {
             info.field_type
         } else {
             format!("{} /* {} */", info.field_type, info.comment).into()
         };
+
+        if property.array_dim > 1 {
+            field_type = format!("[{}; {}]", field_type, property.array_dim).into();
+        }
 
         struct_gen.field(&field_name, field_type.as_ref());
 
