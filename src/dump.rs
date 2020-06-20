@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
+use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -21,6 +21,7 @@ static mut ENUMERATION: *const Class = ptr::null();
 static mut STRUCTURE: *const Class = ptr::null();
 static mut FUNCTION: *const Class = ptr::null();
 
+static mut ARRAY_PROPERTY: *const Class = ptr::null();
 static mut BOOL_PROPERTY: *const Class = ptr::null();
 static mut BYTE_PROPERTY: *const Class = ptr::null();
 static mut CLASS_PROPERTY: *const Class = ptr::null();
@@ -39,6 +40,9 @@ pub enum Error {
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
+
+    #[error("null inner array property for {0:?}")]
+    NullArrayInner(*const ArrayProperty),
 
     #[error("null interface class for {0:?}")]
     NullInterfaceClass(*const InterfaceProperty),
@@ -146,6 +150,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     STRUCTURE = find("Class Core.ScriptStruct")?;
     FUNCTION = find("Class Core.Function")?;
     
+    ARRAY_PROPERTY = find("Class Core.ArrayProperty")?;
     BOOL_PROPERTY = find("Class Core.BoolProperty")?;
     BYTE_PROPERTY = find("Class Core.ByteProperty")?;
     CLASS_PROPERTY = find("Class Core.ClassProperty")?;
@@ -433,7 +438,19 @@ impl TryFrom<&Property> for PropertyInfo {
         }
 
         Ok(unsafe {
-            if property.is(BOOL_PROPERTY) {
+            if property.is(ARRAY_PROPERTY) {
+                let property: &ArrayProperty = cast(property);
+
+                if let Some(inner) = property.inner.as_ref() {
+                    let inner = PropertyInfo::try_from(inner)?;
+                    let typ = format!("Array<{}>", inner.field_type);
+                    let mut info = Self::new(size_of::<Array<usize>>(), typ.into());
+                    info.comment = inner.comment;
+                    info
+                } else {
+                    return Err(Error::NullArrayInner(property));
+                }
+            } else if property.is(BOOL_PROPERTY) {
                 // not "bool" because bool properties are u32 bitfields.
                 simple!(u32) 
             } else if property.is(BYTE_PROPERTY) {
