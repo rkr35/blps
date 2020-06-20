@@ -370,7 +370,7 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         let field_type = if info.comment.is_empty() {
             info.field_type
         } else {
-            format!("{} // {}", info.field_type, info.comment).into()
+            format!("{} /* {} */", info.field_type, info.comment).into()
         };
 
         struct_gen.field(&field_name, field_type.as_ref());
