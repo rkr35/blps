@@ -172,7 +172,8 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use std::ops::{Deref, DerefMut};");
+    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptInterface};\n\
+               use std::ops::{Deref, DerefMut};");
 }
 
 unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
