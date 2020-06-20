@@ -68,6 +68,10 @@ impl Bitfields {
     }
 
     pub fn emit(self, sdk: &mut Scope, structure: &'static str) {
+        if self.bitfields.is_empty() {
+            return;
+        }
+        
         sdk.raw(&{
             let bitfields: Vec<String> = self
                 .bitfields
