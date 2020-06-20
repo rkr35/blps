@@ -1,6 +1,9 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::find_map)]
 
+#[cfg(not(all(target_arch = "x86", target_os = "windows")))]
+compile_error!("You must be compile this crate as a 32-bit Windows .DLL.");
+
 use std::io::{self, Read};
 use std::ptr;
 

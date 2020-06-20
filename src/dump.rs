@@ -421,6 +421,7 @@ impl TryFrom<&Property> for PropertyInfo {
     type Error = Error;
 
     fn try_from(property: &Property) -> Result<Self, Self::Error> {
+        #[allow(clippy::cast_possible_truncation)]
         fn size_of<T>() -> u32 {
             mem::size_of::<T>() as u32
         }
