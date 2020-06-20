@@ -77,8 +77,8 @@ pub enum Error {
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
 
-    // #[error("unknown property type for {0:?}")]
-    // UnknownProperty(*const Property),
+    #[error("unknown property type for {0:?}")]
+    UnknownProperty(*const Property),
 }
 
 pub unsafe fn _names() -> Result<(), Error> {
@@ -546,8 +546,7 @@ impl TryFrom<&Property> for PropertyInfo {
             } else if property.is(STR_PROPERTY) { 
                 simple!(FString)
             } else {
-                simple!(i8)
-                // todo!();
+                return Err(Error::UnknownProperty(property))
             }
         })
     }
