@@ -332,6 +332,8 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
 unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
     let mut previous_bitfield: Option<&BoolProperty> = None;
 
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+
     for property in properties {
         if *offset < property.offset {
             previous_bitfield = None;
@@ -349,7 +351,15 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
 
         let field_name = {
             let o: &Object = property;
-            format!("pub {}", get_name(o)?)
+            let name = get_name(o)?;
+
+            let count = counts.entry(name).and_modify(|c| *c += 1).or_default();
+
+            if *count == 0 {
+                format!("pub {}", name)
+            } else {
+                format!("pub {}_{}", name, *count)
+            }
         };
 
         let field_type = if info.comment.is_empty() {
