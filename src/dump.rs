@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
+use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -29,6 +29,7 @@ static mut CLASS_PROPERTY: *const Class = ptr::null();
 static mut FLOAT_PROPERTY: *const Class = ptr::null();
 static mut INT_PROPERTY: *const Class = ptr::null();
 static mut INTERFACE_PROPERTY: *const Class = ptr::null();
+static mut MAP_PROPERTY: *const Class = ptr::null();
 static mut NAME_PROPERTY: *const Class = ptr::null();
 static mut OBJECT_PROPERTY: *const Class = ptr::null();
 static mut STR_PROPERTY: *const Class = ptr::null();
@@ -50,6 +51,12 @@ pub enum Error {
 
     #[error("null meta class for {0:?}")]
     NullMetaClass(*const ClassProperty),
+
+    #[error("null map key property for {0:?}")]
+    NullMapKeyProperty(*const MapProperty),
+
+    #[error("null map value property for {0:?}")]
+    NullMapValueProperty(*const MapProperty),
 
     #[error("null name for {0:?}")]
     NullName(*const Object),
@@ -158,6 +165,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
     INT_PROPERTY = find("Class Core.IntProperty")?;
     INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
+    MAP_PROPERTY = find("Class Core.MapProperty")?;
     NAME_PROPERTY = find("Class Core.NameProperty")?;
     OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
     STR_PROPERTY = find("Class Core.StrProperty")?;
@@ -405,7 +413,7 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
 pub struct PropertyInfo {
     size: u32,
     field_type: Cow<'static, str>,
-    comment: &'static str,
+    comment: Cow<'static, str>,
 }
 
 impl PropertyInfo {
@@ -413,7 +421,7 @@ impl PropertyInfo {
         Self { 
             size,
             field_type,
-            comment: "",
+            comment: "".into(),
         }
     }
 }
@@ -481,8 +489,30 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let mut info = simple!(ScriptInterface);
-                info.comment = get_name(property.class.cast())?;
+                info.comment = get_name(property.class.cast())?.into();
                 info
+            } else if property.is(MAP_PROPERTY) {
+                let property: &MapProperty = cast(property);
+
+                if let Some(key) = property.key.as_ref() {
+                    if let Some(value) = property.value.as_ref() {
+                        const MAP_SIZE_BYTES: u32 = 20;
+
+                        let key = PropertyInfo::try_from(key)?;
+                        let value = PropertyInfo::try_from(value)?;
+                        
+                        let typ = format!("[u8; {}]", MAP_SIZE_BYTES);
+
+                        let mut info = Self::new(MAP_SIZE_BYTES, typ.into());
+                        info.comment = format!("Map<{}, {}>", key.field_type, value.field_type).into();
+                        info
+                    } else {
+                        return Err(Error::NullMapValueProperty(property));
+                    }
+                } else {
+                    return Err(Error::NullMapKeyProperty(property));
+                }
+
             } else if property.is(NAME_PROPERTY) {
                 simple!(NameIndex)
             } else if property.is(OBJECT_PROPERTY) {
