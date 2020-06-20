@@ -280,7 +280,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     let structure: *const Struct = object.cast();
     let mut offset: u32 = 0;
     let super_class: *const Struct = (*structure).super_field.cast();
-    let mut struct_gen = sdk
+    let struct_gen = sdk
         .new_struct(name)
         .repr("C")
         .vis("pub");
