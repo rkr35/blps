@@ -168,7 +168,8 @@ unsafe fn find_static_classes() -> Result<(), Error> {
 
 fn add_crate_attributes(scope: &mut Scope) {
     scope.raw("#![allow(dead_code)]\n\
-               #![allow(non_camel_case_types)]");
+               #![allow(non_camel_case_types)]\n\
+               #![allow(non_snake_case)]");
 }
 
 fn add_imports(scope: &mut Scope) {
