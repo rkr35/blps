@@ -22,6 +22,8 @@ use winapi::{
     },
 };
 
+mod bitfield;
+
 mod dump;
 
 mod game;

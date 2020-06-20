@@ -1,4 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
+use crate::bitfield::{Bitfields, PostAddInstruction};
 use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
@@ -294,13 +295,15 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         Some(super_name)
     };
 
-    add_fields(struct_gen, &mut offset, get_properties(structure))?;
+    let bitfields = add_fields(struct_gen, &mut offset, get_properties(structure))?;
 
     let structure_size = (*structure).property_size.into();
 
     if offset < structure_size {
         add_padding(struct_gen, offset, structure_size - offset);
     }
+
+    bitfields.emit(sdk, name);
 
     if let Some(super_class) = super_class {
         add_deref_impls(sdk, name, super_class);
@@ -339,14 +342,12 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     properties
 }
 
-unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
-    let mut previous_bitfield: Option<&BoolProperty> = None;
-
+unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<Bitfields, Error> {
+    let mut bitfields = Bitfields::new();
     let mut counts: HashMap<&str, usize> = HashMap::with_capacity(properties.len());
 
     for property in properties {
         if *offset < property.offset {
-            previous_bitfield = None;
             add_padding(struct_gen, *offset, property.offset - *offset);
         }
 
@@ -359,10 +360,20 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
         }
 
-        let field_name = {
-            let o: &Object = property;
-            let name = get_name(o)?;
+        let mut name = get_name(property as &Object)?;
 
+        if property.is(BOOL_PROPERTY) {
+            let property: &BoolProperty = cast(property);
+
+            
+            if bitfields.add(property.offset, name) == PostAddInstruction::Skip {
+                continue;
+            }
+            
+            name = "bitfield";
+        }
+
+        let field_name = {
             let count = counts.entry(name).and_modify(|c| *c += 1).or_default();
 
             if *count == 0 {
@@ -387,7 +398,7 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         *offset = property.offset + total_property_size;
     }
 
-    Ok(())
+    Ok(bitfields)
 }
 
 unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
