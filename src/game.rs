@@ -2,7 +2,6 @@ use crate::GLOBAL_NAMES;
 
 use std::ffi::{CStr, OsString, c_void};
 use std::iter;
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
 use std::os::windows::ffi::OsStringExt;
@@ -11,6 +10,10 @@ use std::slice;
 
 pub type Objects = Array<*mut Object>;
 pub type Names = Array<*const Name>;
+
+pub unsafe fn cast<To>(from: &Object) -> &To {
+    &*(from as *const Object as *const To)
+}
 
 impl Objects {
     pub unsafe fn find(&self, full_name: &str) -> Option<*const Object> {
@@ -115,7 +118,7 @@ impl Object {
     pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Class> {
         iter::successors(self.class.as_ref(), |current| current.super_field
             .as_ref()
-            .map(|field| mem::transmute::<&Field, &Class>(field)))
+            .map(|field| cast::<Class>(field)))
     }
 
     pub unsafe fn name(&self) -> Option<&str> {

@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, ByteProperty, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
+use crate::game::{BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -336,10 +336,6 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     );
 
     properties
-}
-
-unsafe fn cast<To>(from: &Object) -> &To {
-    mem::transmute::<&Object, &To>(from)
 }
 
 unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<(), Error> {
