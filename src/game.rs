@@ -535,3 +535,8 @@ impl DerefMut for DelegateProperty {
         &mut self.property
     }
 }
+
+#[repr(C)]
+pub struct ScriptDelegate {
+    pad: [u8; 0xC],
+}

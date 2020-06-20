@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptInterface, Struct, StructProperty};
+use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
 use std::borrow::Cow;
@@ -26,6 +26,7 @@ static mut ARRAY_PROPERTY: *const Class = ptr::null();
 static mut BOOL_PROPERTY: *const Class = ptr::null();
 static mut BYTE_PROPERTY: *const Class = ptr::null();
 static mut CLASS_PROPERTY: *const Class = ptr::null();
+static mut DELEGATE_PROPERTY: *const Class = ptr::null();
 static mut FLOAT_PROPERTY: *const Class = ptr::null();
 static mut INT_PROPERTY: *const Class = ptr::null();
 static mut INTERFACE_PROPERTY: *const Class = ptr::null();
@@ -162,6 +163,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     BOOL_PROPERTY = find("Class Core.BoolProperty")?;
     BYTE_PROPERTY = find("Class Core.ByteProperty")?;
     CLASS_PROPERTY = find("Class Core.ClassProperty")?;
+    DELEGATE_PROPERTY = find("Class Core.DelegateProperty")?;
     FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
     INT_PROPERTY = find("Class Core.IntProperty")?;
     INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
@@ -182,7 +184,7 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptInterface};\n\
+    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
                use std::ops::{Deref, DerefMut};");
 }
 
@@ -477,6 +479,8 @@ impl TryFrom<&Property> for PropertyInfo {
                 let typ = format!("Option<&'static {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
+            } else if property.is(DELEGATE_PROPERTY) {
+                simple!(ScriptDelegate)
             } else if property.is(FLOAT_PROPERTY) {
                 simple!(f32)
             } else if property.is(INT_PROPERTY) {
