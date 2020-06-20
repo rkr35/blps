@@ -5,6 +5,7 @@ use crate::TimeIt;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
@@ -232,37 +233,20 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let object: *const Enum = object.cast();
 
-    // TODO: This implementation can probably refactored using typestates.
-    let mut previous: Option<&str> = None;
-    let mut count = 0;
+    let mut counts: HashMap<&str, usize> = HashMap::new();
 
     for variant in (*object).variants() {
         let variant = variant.ok_or(Error::BadVariant(object))?;
 
-        if let Some(prev) = previous {
-            if prev == variant {
-                enum_gen.new_variant(&format!("{}_{}", prev, count));
-                count += 1;
-            } else {
-                if count > 0 {
-                    enum_gen.new_variant(&format!("{}_{}", prev, count));
-                } else {
-                    enum_gen.new_variant(prev);
-                }
-                previous = Some(variant);
-                count = 0;
-            }
-        } else {
-            previous = Some(variant);
-            count = 0;
-        }
-    }
+        let count = counts
+            .entry(variant)
+            .and_modify(|c| *c += 1)
+            .or_default();
 
-    if let Some(previous) = previous {
-        if count > 0 {
-            enum_gen.new_variant(&format!("{}_{}", previous, count));
+        if *count == 0 {
+            enum_gen.new_variant(variant);
         } else {
-            enum_gen.new_variant(previous);
+            enum_gen.new_variant(&format!("{}_{}", variant, *count));
         }
     }
 
