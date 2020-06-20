@@ -353,11 +353,11 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         let info = PropertyInfo::try_from(property)?;
 
         let total_property_size = property.element_size * property.array_dim;
-        // let size_mismatch = total_property_size - info.size * property.array_dim;
+        let size_mismatch = total_property_size - info.size * property.array_dim;
 
-        // if size_mismatch > 0 {
-        //     return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
-        // }
+        if size_mismatch > 0 {
+            return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
+        }
 
         let field_name = {
             let o: &Object = property;
