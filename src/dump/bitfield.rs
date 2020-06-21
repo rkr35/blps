@@ -118,7 +118,7 @@ impl Bitfields {
         }
     }
 
-    pub fn emit(self, sdk: &mut Scope, structure: &'static str) {
+    pub fn emit(self, sdk: &mut Scope, structure: &str) {
         if self.bitfields.is_empty() {
             return;
         }

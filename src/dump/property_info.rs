@@ -1,5 +1,5 @@
-use crate::GLOBAL_OBJECTS;
-use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
+use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
+use crate::dump::helper;
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -24,6 +24,9 @@ static mut STRUCT_PROPERTY: *const Class = ptr::null();
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("helper error: {0}")]
+    Helper(#[from] helper::Error),
+
     #[error("null inner array property for {0:?}")]
     NullArrayInner(*const ArrayProperty),
 
@@ -39,47 +42,30 @@ pub enum Error {
     // #[error("null map value property for {0:?}")]
     // NullMapValueProperty(*const MapProperty),
 
-    #[error("null name for {0:?}")]
-    NullName(*const Object),
-
     #[error("null property class for {0:?}")]
     NullPropertyClass(*const ObjectProperty),
 
     #[error("null property struct for {0:?}")]
     NullPropertyStruct(*const StructProperty),
 
-    #[error("unable to find static class for \"{0}\"")]
-    StaticClassNotFound(&'static str),
-
     #[error("unknown property type for {0:?}")]
     UnknownProperty(*const Property),
 }
 
-unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
-    Ok((*object).name().ok_or(Error::NullName(object))?)
-}
-
 pub unsafe fn find_static_classes() -> Result<(), Error> {
-    unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
-        Ok((*GLOBAL_OBJECTS)
-                .find(class)
-                .map(|o| o.cast())
-                .ok_or(Error::StaticClassNotFound(class))?)
-    }
-
-    ARRAY_PROPERTY = find("Class Core.ArrayProperty")?;
-    BOOL_PROPERTY = find("Class Core.BoolProperty")?;
-    BYTE_PROPERTY = find("Class Core.ByteProperty")?;
-    CLASS_PROPERTY = find("Class Core.ClassProperty")?;
-    DELEGATE_PROPERTY = find("Class Core.DelegateProperty")?;
-    FLOAT_PROPERTY = find("Class Core.FloatProperty")?;
-    INT_PROPERTY = find("Class Core.IntProperty")?;
-    INTERFACE_PROPERTY = find("Class Core.InterfaceProperty")?;
-    MAP_PROPERTY = find("Class Core.MapProperty")?;
-    NAME_PROPERTY = find("Class Core.NameProperty")?;
-    OBJECT_PROPERTY = find("Class Core.ObjectProperty")?;
-    STR_PROPERTY = find("Class Core.StrProperty")?;
-    STRUCT_PROPERTY = find("Class Core.StructProperty")?;
+    ARRAY_PROPERTY = helper::find("Class Core.ArrayProperty")?;
+    BOOL_PROPERTY = helper::find("Class Core.BoolProperty")?;
+    BYTE_PROPERTY = helper::find("Class Core.ByteProperty")?;
+    CLASS_PROPERTY = helper::find("Class Core.ClassProperty")?;
+    DELEGATE_PROPERTY = helper::find("Class Core.DelegateProperty")?;
+    FLOAT_PROPERTY = helper::find("Class Core.FloatProperty")?;
+    INT_PROPERTY = helper::find("Class Core.IntProperty")?;
+    INTERFACE_PROPERTY = helper::find("Class Core.InterfaceProperty")?;
+    MAP_PROPERTY = helper::find("Class Core.MapProperty")?;
+    NAME_PROPERTY = helper::find("Class Core.NameProperty")?;
+    OBJECT_PROPERTY = helper::find("Class Core.ObjectProperty")?;
+    STR_PROPERTY = helper::find("Class Core.StrProperty")?;
+    STRUCT_PROPERTY = helper::find("Class Core.StructProperty")?;
 
     Ok(())
 }
@@ -138,7 +124,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 if property.enumeration.is_null() {
                     simple!(u8)
                 } else {
-                    let typ = get_name(property.enumeration.cast())?;
+                    let typ = helper::get_name(property.enumeration.cast())?;
                     Self::new(size_of::<u8>(), typ.into())
                 }
             } else if property.is(CLASS_PROPERTY) {
@@ -148,7 +134,7 @@ impl TryFrom<&Property> for PropertyInfo {
                     return Err(Error::NullMetaClass(property));
                 }
 
-                let name = get_name(property.meta_class.cast())?;
+                let name = helper::get_name(property.meta_class.cast())?;
                 let typ = format!("Option<&'static {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
@@ -166,7 +152,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let mut info = simple!(ScriptInterface);
-                info.comment = get_name(property.class.cast())?.into();
+                info.comment = helper::get_name(property.class.cast())?.into();
                 info
             } else if property.is(MAP_PROPERTY) {
                 const MAP_SIZE_BYTES: u32 = 60;
@@ -183,7 +169,7 @@ impl TryFrom<&Property> for PropertyInfo {
                     return Err(Error::NullPropertyClass(property));
                 }
 
-                let name = get_name(property.class.cast())?;
+                let name = helper::get_name(property.class.cast())?;
                 let typ = format!("Option<&'static {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
@@ -196,7 +182,7 @@ impl TryFrom<&Property> for PropertyInfo {
                     return Err(Error::NullPropertyStruct(property));
                 }
 
-                let typ = get_name(property.inner_struct.cast())?;
+                let typ = helper::get_name(property.inner_struct.cast())?;
                 Self::new(property.element_size, typ.into())
             } else {
                 return Err(Error::UnknownProperty(property))

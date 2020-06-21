@@ -2,6 +2,7 @@ use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use crate::game::{BoolProperty, cast, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -12,11 +13,13 @@ use std::iter;
 use std::ptr;
 
 use codegen::{Scope, Struct as StructGen};
-use log::{info, warn};
+use log::info;
 use thiserror::Error;
 
 mod bitfield;
 use bitfield::{Bitfields, PostAddInstruction};
+
+mod helper;
 
 mod property_info;
 use property_info::{BOOL_PROPERTY, PropertyInfo};
@@ -32,20 +35,17 @@ pub enum Error {
     #[error("enum {0:?} has an unknown or ill-formed variant")]
     BadVariant(*const Enum),
 
+    #[error("helper error: {0}")]
+    Helper(#[from] helper::Error),
+    
     #[error("io error: {0}")]
     Io(#[from] io::Error),
-
-    #[error("null name for {0:?}")]
-    NullName(*const Object),
 
     #[error("property info error: {0}")]
     PropertyInfo(#[from] property_info::Error),
 
     #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
     PropertySizeMismatch(*const Property, u32, PropertyInfo),
-
-    #[error("unable to find static class for \"{0}\"")]
-    StaticClassNotFound(&'static str),
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
@@ -115,20 +115,13 @@ pub unsafe fn sdk() -> Result<(), Error> {
 }
 
 unsafe fn find_static_classes() -> Result<(), Error> {
-    unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
-        Ok((*GLOBAL_OBJECTS)
-                .find(class)
-                .map(|o| o.cast())
-                .ok_or(Error::StaticClassNotFound(class))?)
-    }
-    
     let _time = TimeIt::new("find static classes");
 
-    CLASS = find("Class Core.Class")?;
-    CONSTANT = find("Class Core.Const")?;
-    ENUMERATION = find("Class Core.Enum")?;
-    FUNCTION = find("Class Core.Function")?;
-    STRUCTURE = find("Class Core.ScriptStruct")?;
+    CLASS = helper::find("Class Core.Class")?;
+    CONSTANT = helper::find("Class Core.Const")?;
+    ENUMERATION = helper::find("Class Core.Enum")?;
+    FUNCTION = helper::find("Class Core.Function")?;
+    STRUCTURE = helper::find("Class Core.ScriptStruct")?;
 
     property_info::find_static_classes()?;
 
@@ -180,27 +173,27 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
         value
     };
 
-    sdk.raw(&format!("// {} = {}", get_name(object)?, value));
+    sdk.raw(&format!("// {} = {}", helper::get_name(object)?, value));
     Ok(())
 }
 
-unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
-    Ok((*object).name().ok_or(Error::NullName(object))?)
-}
-
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = get_name(object)?;
+    let name = {
+        let mut n = Cow::Borrowed(helper::get_name(object)?);
+        
+        if n.starts_with("Default__") {
+            return Ok(());
+        }
 
-    if name.starts_with("Default__") {
-        return Ok(());
-    }
+        if let Some(resolved_name) = helper::resolve_duplicate(object, &n)? {
+            info!("Resolved duplicate {} to {}.", n, resolved_name);
+            n = Cow::Owned(resolved_name);
+        }
 
-    if is_enum_duplicate(name) {
-        warn!("Ignoring {} because multiple enums have this name.", name);
-        return Ok(());
-    }
+        n
+    };
 
-    let enum_gen = sdk.new_enum(name).repr("u8").vis("pub");
+    let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
 
     let object: *const Enum = object.cast();
 
@@ -224,24 +217,23 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
     Ok(())
 }
 
-fn is_enum_duplicate(name: &str) -> bool {
-    const DUPLICATES: [&str; 2] = ["ECompareObjectOutputLinkIds", "EFlightMode"];
-    DUPLICATES.iter().any(|dup| name == *dup)
-}
-
 unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = get_name(object)?;
+    let name = {
+        let mut n = Cow::Borrowed(helper::get_name(object)?);
+        
+        if let Some(resolved_name) = helper::resolve_duplicate(object, &n)? {
+            info!("Resolved duplicate {} to {}.", n, resolved_name);
+            n = Cow::Owned(resolved_name);
+        }
 
-    if is_struct_duplicate(name) {
-        warn!("Ignoring {} because multiple structs have this name.", name);
-        return Ok(());
-    }
+        n
+    };
 
     let structure: *const Struct = object.cast();
     let mut offset: u32 = 0;
     let super_class: *const Struct = (*structure).super_field.cast();
     let struct_gen = sdk
-        .new_struct(name)
+        .new_struct(&name)
         .repr("C")
         .vis("pub");
 
@@ -250,7 +242,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     } else {
         offset = (*super_class).property_size.into();
 
-        let super_name = get_name(super_class.cast())?;
+        let super_name = helper::get_name(super_class.cast())?;
         struct_gen.field("base", super_name);
         Some(super_name)
     };
@@ -264,18 +256,13 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         add_padding(struct_gen, offset, structure_size - offset);
     }
 
-    bitfields.emit(sdk, name);
+    bitfields.emit(sdk, &name);
 
     if let Some(super_class) = super_class {
-        add_deref_impls(sdk, name, super_class);
+        add_deref_impls(sdk, &name, super_class);
     }
     
     Ok(())
-}
-
-fn is_struct_duplicate(name: &str) -> bool {
-    const DUPLICATES: [&str; 3] = ["CheckpointRecord", "TerrainWeightedMaterial", "ProjectileBehaviorSequenceStateData"];
-    DUPLICATES.iter().any(|dup| name == *dup)
 }
 
 unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
@@ -323,7 +310,7 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
         }
 
-        let mut name = get_name(property as &Object)?;
+        let mut name = helper::get_name(property as &Object)?;
 
         if property.is(BOOL_PROPERTY) {
             let property: &BoolProperty = cast(property);
