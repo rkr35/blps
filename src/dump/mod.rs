@@ -2,7 +2,6 @@ use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use crate::game::{BoolProperty, cast, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
 
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -178,21 +177,12 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = {
-        let mut n = Cow::Borrowed(helper::get_name(object)?);
-        
-        if n.starts_with("Default__") {
-            return Ok(());
-        }
-
-        if let Some(resolved_name) = helper::resolve_duplicate(object, &n)? {
-            info!("Resolved duplicate {} to {}.", n, resolved_name);
-            n = Cow::Owned(resolved_name);
-        }
-
-        n
-    };
-
+    let name = helper::resolve_duplicate(object)?;
+    
+    if name.starts_with("Default__") {
+        return Ok(());
+    }
+    
     let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
 
     let object: *const Enum = object.cast();
@@ -218,16 +208,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 }
 
 unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    let name = {
-        let mut n = Cow::Borrowed(helper::get_name(object)?);
-        
-        if let Some(resolved_name) = helper::resolve_duplicate(object, &n)? {
-            info!("Resolved duplicate {} to {}.", n, resolved_name);
-            n = Cow::Owned(resolved_name);
-        }
-
-        n
-    };
+    let name = helper::resolve_duplicate(object)?;
 
     let structure: *const Struct = object.cast();
     let mut offset: u32 = 0;

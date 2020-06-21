@@ -1,6 +1,8 @@
 use crate::GLOBAL_OBJECTS;
 use crate::game::{Class, Object};
 
+use std::borrow::Cow;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,7 +17,7 @@ pub enum Error {
     StaticClassNotFound(&'static str),
 }
 
-pub unsafe fn resolve_duplicate(object: *const Object, name: &str) -> Result<Option<String>, Error> {
+pub unsafe fn resolve_duplicate(object: *const Object) -> Result<Cow<'static, str>, Error> {
     const DUPLICATES: [&str; 5] = [
         "ECompareObjectOutputLinkIds",
         "EFlightMode",
@@ -23,6 +25,8 @@ pub unsafe fn resolve_duplicate(object: *const Object, name: &str) -> Result<Opt
         "TerrainWeightedMaterial",
         "ProjectileBehaviorSequenceStateData"
     ];
+
+    let name = get_name(object)?;
 
     if DUPLICATES.iter().any(|dup| name == *dup) {
         let mut module = None;
@@ -36,9 +40,9 @@ pub unsafe fn resolve_duplicate(object: *const Object, name: &str) -> Result<Opt
         let module = get_name(module.ok_or(Error::ModuleSubmodule(object))?)?;
         let submodule = get_name(submodule.ok_or(Error::ModuleSubmodule(object))?)?;
 
-        Ok(Some(format!("{}_{}_{}", module, submodule, name)))
+        Ok(format!("{}_{}_{}", module, submodule, name).into())
     } else {
-        Ok(None)
+        Ok(name.into())
     }
 }
 
