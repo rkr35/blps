@@ -68,7 +68,7 @@ impl Bitfield {
 
             imp
                 .new_fn(&format!("is_{}", normalized))
-                .doc(&field)
+                .doc(&format!("get {}", field))
                 .vis("pub")
                 .arg_ref_self()
                 .ret("bool")
@@ -76,7 +76,7 @@ impl Bitfield {
 
             imp
                 .new_fn(&format!("set_{}", normalized))
-                .doc(&field)
+                .doc(&format!("set {}", field))
                 .vis("pub")
                 .arg_mut_self()
                 .arg("value", "bool")
