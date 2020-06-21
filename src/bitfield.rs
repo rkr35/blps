@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use codegen::{Impl, Scope};
 use heck::SnakeCase;
@@ -20,20 +21,54 @@ impl Bitfield {
     }
 
     pub fn emit(self, imp: &mut Impl, name: Cow<str>) {
+        let mut counts: HashMap<Cow<str>, usize> = HashMap::new();
+
+        let mut get_count = |s| *counts
+            .entry(s)
+            .and_modify(|c| *c += 1)
+            .or_default();
+
         for (bit, field) in self.fields.into_iter().enumerate() {
-            let mut normalized = field;
+            let field = {
+                let mut f = Cow::Borrowed(field);
+                
+                let count = get_count(field.into());
+    
+                if count > 0 {
+                    f = Cow::Owned(format!("{}_{}", field, count));
+                }
 
-            let bytes = field.as_bytes();
-            
-            if field.len() >= 2 && bytes[0] == b'b' && bytes[1].is_ascii_uppercase() {
-                normalized = &field[1..];
-            }
+                f
+            };
 
-            let normalized = normalized.to_snake_case();
+            let normalized = {
+                let bytes = field.as_bytes();
+                
+                let has_hungarian_prefix = field.len() >= 2
+                    && bytes[0] == b'b'
+                    && bytes[1].is_ascii_uppercase();
+
+                let f = if has_hungarian_prefix {
+                    &field[1..]
+                } else {
+                    &field
+                };
+    
+                let mut normalized = f.to_snake_case();
+
+                let count = get_count(normalized.clone().into());
+
+                if count > 0 {
+                    normalized += "_";
+                    normalized += &count.to_string();
+                }
+
+                normalized
+            };
 
             imp
                 .new_fn(&format!("is_{}", normalized))
-                .doc(field)
+                .doc(&field)
                 .vis("pub")
                 .arg_ref_self()
                 .ret("bool")
@@ -41,7 +76,7 @@ impl Bitfield {
 
             imp
                 .new_fn(&format!("set_{}", normalized))
-                .doc(field)
+                .doc(&field)
                 .vis("pub")
                 .arg_mut_self()
                 .arg("value", "bool")
