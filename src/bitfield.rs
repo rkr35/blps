@@ -1,8 +1,9 @@
-use std::fmt::{self, Display, Formatter};
+use std::borrow::Cow;
 
-use codegen::Scope;
+use codegen::{Impl, Scope};
+use heck::SnakeCase;
 
-const INDENT: &str = "    ";
+pub const FIELD: &str = "bitfield";
 
 struct Bitfield {
     offset: u32,
@@ -17,20 +18,35 @@ impl Bitfield {
     fn add(&mut self, field: &'static str) {
         self.fields.push(field);
     }
-}
 
-impl Display for Bitfield {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let fields: Vec<String> = self
-            .fields
-            .iter()
-            .enumerate()
-            .map(|(i, field)| format!("{indent}{indent}{indent}{} 1 << {}", field, i, indent=INDENT))
-            .collect();
+    pub fn emit(self, imp: &mut Impl, name: Cow<str>) {
+        for (bit, field) in self.fields.into_iter().enumerate() {
+            let mut normalized = field;
 
-        let fields = fields.join("\n");
+            let bytes = field.as_bytes();
+            
+            if field.len() >= 2 && bytes[0] == b'b' && bytes[1].is_ascii_uppercase() {
+                normalized = &field[1..];
+            }
 
-        write!(f, "{}", fields)
+            let normalized = normalized.to_snake_case();
+
+            imp
+                .new_fn(&format!("is_{}", normalized))
+                .doc(field)
+                .vis("pub")
+                .arg_ref_self()
+                .ret("bool")
+                .line(format!("is_bit_set(self.{}, {})", name, bit));
+
+            imp
+                .new_fn(&format!("set_{}", normalized))
+                .doc(field)
+                .vis("pub")
+                .arg_mut_self()
+                .arg("value", "bool")
+                .line(format!("set_bit(&mut self.{}, {}, value);", name, bit));
+        }
     }
 }
 
@@ -71,43 +87,17 @@ impl Bitfields {
         if self.bitfields.is_empty() {
             return;
         }
-        
-        sdk.raw(&{
-            let bitfields: Vec<String> = self
-                .bitfields
-                .into_iter()
-                .enumerate()
-                .map(|(i, bitfield)| {
-                    let name = if i > 0 {
-                        format!("_{}", i)
-                    } else {
-                        String::new()
-                    };
 
-                    format!("{indent}{indent}bitfield{}:\n{}", name, bitfield, indent=INDENT)
-                })
-                .collect();
-            
-            let bitfields = bitfields.join("\n\n");
+        let imp = sdk.new_impl(structure);
 
-            format!("/*\n{indent}Bitfields for {}:\n\n{}\n*/", structure, bitfields, indent=INDENT)
-        });
+        for (i, bitfield) in self.bitfields.into_iter().enumerate() {
+            let name: Cow<str> = if i > 0 {
+                format!("{}_{}", FIELD, i).into()
+            } else {
+                FIELD.into()
+            };
 
-        /*
-            Bitfields for `structure`:
-
-                bitfield:
-                    a 1 << 0
-                    b 1 << 2
-                    c 1 << 3
-                    ...
-
-                bitfield_1:
-                    x 1 << 0
-                    y 1 << 1
-                    ...
-
-                ...
-        */
+            bitfield.emit(imp, name);
+        }
     }
 }

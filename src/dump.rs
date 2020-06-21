@@ -1,5 +1,5 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::bitfield::{Bitfields, PostAddInstruction};
+use crate::bitfield::{self, Bitfields, PostAddInstruction};
 use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
@@ -185,7 +185,7 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+    scope.raw("use crate::game::{Array, FString, is_bit_set, NameIndex, ScriptDelegate, ScriptInterface, set_bit};\n\
                use std::ops::{Deref, DerefMut};");
 }
 
@@ -370,7 +370,7 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
                 continue;
             }
             
-            name = "bitfield";
+            name = bitfield::FIELD;
         }
 
         let field_name = {
