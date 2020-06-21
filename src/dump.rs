@@ -5,8 +5,8 @@ use crate::TimeIt;
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
@@ -157,8 +157,8 @@ unsafe fn find_static_classes() -> Result<(), Error> {
 
     CONSTANT = find("Class Core.Const")?;
     ENUMERATION = find("Class Core.Enum")?;
-    STRUCTURE = find("Class Core.ScriptStruct")?;
     FUNCTION = find("Class Core.Function")?;
+    STRUCTURE = find("Class Core.ScriptStruct")?;
     
     ARRAY_PROPERTY = find("Class Core.ArrayProperty")?;
     BOOL_PROPERTY = find("Class Core.BoolProperty")?;
@@ -548,6 +548,8 @@ impl TryFrom<&Property> for PropertyInfo {
                 let typ = format!("Option<&'static {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
+            } else if property.is(STR_PROPERTY) { 
+                simple!(FString)
             } else if property.is(STRUCT_PROPERTY) {
                 let property: &StructProperty = cast(property);
                 
@@ -557,8 +559,6 @@ impl TryFrom<&Property> for PropertyInfo {
 
                 let typ = get_name(property.inner_struct.cast())?;
                 Self::new(property.element_size, typ.into())
-            } else if property.is(STR_PROPERTY) { 
-                simple!(FString)
             } else {
                 return Err(Error::UnknownProperty(property))
             }
