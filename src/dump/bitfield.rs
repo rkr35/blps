@@ -30,12 +30,12 @@ impl Bitfield {
 
         for (bit, field) in self.fields.into_iter().enumerate() {
             let field = {
-                let mut f = Cow::Borrowed(field);
+                let mut f: Cow<str> = field.into();
                 
                 let count = get_count(field.into());
     
                 if count > 0 {
-                    f = Cow::Owned(format!("{}_{}", field, count));
+                    f = format!("{}_{}", field, count).into();
                 }
 
                 f
