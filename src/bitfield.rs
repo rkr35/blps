@@ -20,7 +20,7 @@ impl Bitfield {
         self.fields.push(field);
     }
 
-    pub fn emit(self, imp: &mut Impl, name: Cow<str>) {
+    pub fn emit(self, imp: &mut Impl, name: &str) {
         let mut counts: HashMap<Cow<str>, usize> = HashMap::new();
 
         let mut get_count = |s| *counts
@@ -132,7 +132,7 @@ impl Bitfields {
                 FIELD.into()
             };
 
-            bitfield.emit(imp, name);
+            bitfield.emit(imp, &name);
         }
     }
 }
