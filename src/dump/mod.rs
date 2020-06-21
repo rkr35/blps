@@ -339,6 +339,8 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         let field_name = {
             let count = counts.entry(name).and_modify(|c| *c += 1).or_default();
 
+            let name = scrub_reserved_name(name);
+
             if *count == 0 {
                 format!("pub {}", name)
             } else {
@@ -362,6 +364,13 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
     }
 
     Ok(bitfields)
+}
+
+fn scrub_reserved_name(name: &str) -> &str {
+    match name {
+        "mod" => "r#mod",
+        name => name,
+    }
 }
 
 unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
