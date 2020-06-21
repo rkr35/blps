@@ -295,7 +295,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         Some(super_name)
     };
 
-    let bitfields = add_fields(struct_gen, &mut offset, get_properties(structure))?;
+    let properties = get_properties(structure, offset);
+    let bitfields = add_fields(struct_gen, &mut offset, properties)?;
 
     let structure_size = (*structure).property_size.into();
 
@@ -317,7 +318,7 @@ fn is_struct_duplicate(name: &str) -> bool {
     DUPLICATES.iter().any(|dup| name == *dup)
 }
 
-unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
+unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
     let properties = iter::successors(
         (*structure).children.cast::<Property>().as_ref(),
         |property| property.next.cast::<Property>().as_ref()
@@ -325,6 +326,7 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
 
     let mut properties: Vec<&Property> = properties
         .filter(|p| p.element_size > 0)
+        .filter(|p| p.offset >= offset)
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
         .collect();
 
