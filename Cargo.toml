@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [profile.release]
 codegen-units = 1
-debug = true
+debug = false
 incremental = false
 lto = "fat"
 panic = "abort"
