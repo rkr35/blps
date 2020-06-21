@@ -324,6 +324,7 @@ unsafe fn get_properties(structure: *const Struct) -> Vec<&'static Property> {
     );
 
     let mut properties: Vec<&Property> = properties
+        .filter(|p| p.element_size > 0)
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
         .collect();
 
