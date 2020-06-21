@@ -1,5 +1,5 @@
-use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
 use crate::dump::helper;
+use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
