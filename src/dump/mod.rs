@@ -1,5 +1,4 @@
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::bitfield::{self, Bitfields, PostAddInstruction};
 use crate::game::{Array, ArrayProperty, BoolProperty, ByteProperty, cast, Class, ClassProperty, Const, Enum, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, Struct, StructProperty};
 use crate::TimeIt;
 
@@ -18,6 +17,10 @@ use codegen::{Scope, Struct as StructGen};
 use log::{info, warn};
 use thiserror::Error;
 
+mod bitfield;
+use bitfield::{Bitfields, PostAddInstruction};
+
+static mut CLASS: *const Class = ptr::null();
 static mut CONSTANT: *const Class = ptr::null();
 static mut ENUMERATION: *const Class = ptr::null();
 static mut STRUCTURE: *const Class = ptr::null();
@@ -155,6 +158,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     
     let _time = TimeIt::new("find static classes");
 
+    CLASS = find("Class Core.Class")?;
     CONSTANT = find("Class Core.Const")?;
     ENUMERATION = find("Class Core.Enum")?;
     FUNCTION = find("Class Core.Function")?;
@@ -196,6 +200,8 @@ unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Err
         write_enumeration(sdk, object)?;
     } else if (*object).is(STRUCTURE) {
         write_structure(sdk, object)?;
+    } else if (*object).is(CLASS) {
+        write_class(sdk, object)?;
     }
     Ok(())
 }
@@ -427,6 +433,10 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .arg_mut_self()
         .ret("&mut Self::Target")
         .line("&mut self.base");
+}
+
+unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+    Ok(())
 }
 
 #[derive(Debug)]
