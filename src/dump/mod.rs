@@ -389,6 +389,6 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .line("&mut self.base");
 }
 
-unsafe fn write_class(_sdk: &mut Scope, _object: *const Object) -> Result<(), Error> {
-    Ok(())
+unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+    write_structure(sdk, object)
 }

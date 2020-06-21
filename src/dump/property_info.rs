@@ -1,5 +1,5 @@
 use crate::GLOBAL_OBJECTS;
-use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, MapProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
+use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, Object, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -33,11 +33,11 @@ pub enum Error {
     #[error("null meta class for {0:?}")]
     NullMetaClass(*const ClassProperty),
 
-    #[error("null map key property for {0:?}")]
-    NullMapKeyProperty(*const MapProperty),
+    // #[error("null map key property for {0:?}")]
+    // NullMapKeyProperty(*const MapProperty),
 
-    #[error("null map value property for {0:?}")]
-    NullMapValueProperty(*const MapProperty),
+    // #[error("null map value property for {0:?}")]
+    // NullMapValueProperty(*const MapProperty),
 
     #[error("null name for {0:?}")]
     NullName(*const Object),
@@ -169,27 +169,11 @@ impl TryFrom<&Property> for PropertyInfo {
                 info.comment = get_name(property.class.cast())?.into();
                 info
             } else if property.is(MAP_PROPERTY) {
-                let property: &MapProperty = cast(property);
-
-                if let Some(key) = property.key.as_ref() {
-                    if let Some(value) = property.value.as_ref() {
-                        const MAP_SIZE_BYTES: u32 = 20;
-
-                        let key = PropertyInfo::try_from(key)?;
-                        let value = PropertyInfo::try_from(value)?;
-                        
-                        let typ = format!("[u8; {}]", MAP_SIZE_BYTES);
-
-                        let mut info = Self::new(MAP_SIZE_BYTES, typ.into());
-                        info.comment = format!("Map<{}, {}>", key.field_type, value.field_type).into();
-                        info
-                    } else {
-                        return Err(Error::NullMapValueProperty(property));
-                    }
-                } else {
-                    return Err(Error::NullMapKeyProperty(property));
-                }
-
+                const MAP_SIZE_BYTES: u32 = 60;
+                let typ = format!("[u8; {}]", MAP_SIZE_BYTES);
+                let mut info = Self::new(MAP_SIZE_BYTES, typ.into());
+                info.comment = "Map".into();
+                info
             } else if property.is(NAME_PROPERTY) {
                 simple!(NameIndex)
             } else if property.is(OBJECT_PROPERTY) {
