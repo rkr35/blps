@@ -125,7 +125,7 @@ impl TryFrom<&Property> for PropertyInfo {
                     simple!(u8)
                 } else {
                     let typ = helper::resolve_duplicate(property.enumeration.cast())?;
-                    Self::new(size_of::<u8>(), typ.into())
+                    Self::new(size_of::<u8>(), typ)
                 }
             } else if property.is(CLASS_PROPERTY) {
                 let property: &ClassProperty = cast(property);
@@ -183,7 +183,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let typ = helper::resolve_duplicate(property.inner_struct.cast())?;
-                Self::new(property.element_size, typ.into())
+                Self::new(property.element_size, typ)
             } else {
                 return Err(Error::UnknownProperty(property))
             }
