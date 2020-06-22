@@ -23,7 +23,6 @@ heck = "0.3"
 log = "0.4"
 simplelog = "0.8"
 thiserror = "1.0"
-wchar = "0.6"
 winapi = { version = "0.3", features = [
     "consoleapi",
     "libloaderapi",
