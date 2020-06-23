@@ -11,7 +11,7 @@ impl TimeIt {
     pub fn new(task: &str) -> Self {
         let task = String::from(task);
         let begin = Instant::now();
-        Self { begin, task, }
+        Self { begin, task }
     }
 }
 

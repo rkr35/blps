@@ -13,7 +13,10 @@ struct Bitfield {
 
 impl Bitfield {
     fn new(offset: u32, field: &'static str) -> Self {
-        Self { offset, fields: vec![field] }
+        Self {
+            offset,
+            fields: vec![field],
+        }
     }
 
     fn add(&mut self, field: &'static str) {
@@ -23,17 +26,14 @@ impl Bitfield {
     pub fn emit(self, imp: &mut Impl, name: &str) {
         let mut counts: HashMap<Cow<str>, usize> = HashMap::new();
 
-        let mut get_count = |s| *counts
-            .entry(s)
-            .and_modify(|c| *c += 1)
-            .or_default();
+        let mut get_count = |s| *counts.entry(s).and_modify(|c| *c += 1).or_default();
 
         for (bit, field) in self.fields.into_iter().enumerate() {
             let field = {
                 let mut f: Cow<str> = field.into();
-                
+
                 let count = get_count(field.into());
-    
+
                 if count > 0 {
                     f = format!("{}_{}", field, count).into();
                 }
@@ -43,17 +43,16 @@ impl Bitfield {
 
             let normalized = {
                 let bytes = field.as_bytes();
-                
-                let has_hungarian_prefix = field.len() >= 2
-                    && bytes[0] == b'b'
-                    && bytes[1].is_ascii_uppercase();
+
+                let has_hungarian_prefix =
+                    field.len() >= 2 && bytes[0] == b'b' && bytes[1].is_ascii_uppercase();
 
                 let f = if has_hungarian_prefix {
                     &field[1..]
                 } else {
                     &field
                 };
-    
+
                 let mut normalized = f.to_snake_case();
 
                 let count = get_count(normalized.clone().into());
@@ -66,16 +65,14 @@ impl Bitfield {
                 normalized
             };
 
-            imp
-                .new_fn(&format!("is_{}", normalized))
+            imp.new_fn(&format!("is_{}", normalized))
                 .doc(&format!("get {}", field))
                 .vis("pub")
                 .arg_ref_self()
                 .ret("bool")
                 .line(format!("is_bit_set(self.{}, {})", name, bit));
 
-            imp
-                .new_fn(&format!("set_{}", normalized))
+            imp.new_fn(&format!("set_{}", normalized))
                 .doc(&format!("set {}", field))
                 .vis("pub")
                 .arg_mut_self()

@@ -1,5 +1,8 @@
 use crate::dump::helper;
-use crate::game::{Array, ArrayProperty, ByteProperty, cast, Class, ClassProperty, FString, InterfaceProperty, NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty};
+use crate::game::{
+    cast, Array, ArrayProperty, ByteProperty, Class, ClassProperty, FString, InterfaceProperty,
+    NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty,
+};
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -41,7 +44,6 @@ pub enum Error {
 
     // #[error("null map value property for {0:?}")]
     // NullMapValueProperty(*const MapProperty),
-
     #[error("null property class for {0:?}")]
     NullPropertyClass(*const ObjectProperty),
 
@@ -79,7 +81,7 @@ pub struct PropertyInfo {
 
 impl PropertyInfo {
     fn new(size: u32, field_type: Cow<'static, str>) -> Self {
-        Self { 
+        Self {
             size,
             field_type,
             comment: "".into(),
@@ -99,7 +101,7 @@ impl TryFrom<&Property> for PropertyInfo {
         macro_rules! simple {
             ($typ:ty) => {
                 Self::new(size_of::<$typ>(), stringify!($typ).into())
-            }
+            };
         }
 
         Ok(unsafe {
@@ -117,7 +119,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
             } else if property.is(BOOL_PROPERTY) {
                 // not "bool" because bool properties are u32 bitfields.
-                simple!(u32) 
+                simple!(u32)
             } else if property.is(BYTE_PROPERTY) {
                 let property: &ByteProperty = cast(property);
 
@@ -164,7 +166,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 simple!(NameIndex)
             } else if property.is(OBJECT_PROPERTY) {
                 let property: &ObjectProperty = cast(property);
-                
+
                 if property.class.is_null() {
                     return Err(Error::NullPropertyClass(property));
                 }
@@ -173,11 +175,11 @@ impl TryFrom<&Property> for PropertyInfo {
                 let typ = format!("Option<&'static mut {}>", name);
 
                 Self::new(size_of::<usize>(), typ.into())
-            } else if property.is(STR_PROPERTY) { 
+            } else if property.is(STR_PROPERTY) {
                 simple!(FString)
             } else if property.is(STRUCT_PROPERTY) {
                 let property: &StructProperty = cast(property);
-                
+
                 if property.inner_struct.is_null() {
                     return Err(Error::NullPropertyStruct(property));
                 }
@@ -185,7 +187,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 let typ = helper::resolve_duplicate(property.inner_struct.cast())?;
                 Self::new(property.element_size, typ)
             } else {
-                return Err(Error::UnknownProperty(property))
+                return Err(Error::UnknownProperty(property));
             }
         })
     }

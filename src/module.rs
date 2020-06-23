@@ -50,11 +50,12 @@ impl Module {
         let (module, info) = unsafe {
             let module = Module::get_handle(name)?;
 
-            let info = Module::get_info(module).ok_or_else(|| Error::new(name, ErrorKind::GetModuleInformation))?;
-            
+            let info = Module::get_info(module)
+                .ok_or_else(|| Error::new(name, ErrorKind::GetModuleInformation))?;
+
             (module, info)
         };
-        
+
         let base = info.lpBaseOfDll as usize;
         let size = info.SizeOfImage as usize;
 
@@ -65,7 +66,7 @@ impl Module {
             size,
             end: base + size,
         };
-        
+
         Ok(module)
     }
 
@@ -100,7 +101,7 @@ impl Module {
             let base = self.base as *const u8;
             std::slice::from_raw_parts(base, self.size)
         };
-    
+
         memory
             .windows(find_me.len())
             .find(|window| *window == find_me)
@@ -124,11 +125,14 @@ impl Module {
 
         memory
             .windows(pattern.len())
-            .find(|window|
+            .find(|window| {
                 pattern
                     .iter()
                     .zip(window.iter())
-                    .all(|(pattern_byte, module_byte)| pattern_byte.map_or(true, |p| p == *module_byte)))
+                    .all(|(pattern_byte, module_byte)| {
+                        pattern_byte.map_or(true, |p| p == *module_byte)
+                    })
+            })
             .map(|window| window.as_ptr() as usize)
     }
 }

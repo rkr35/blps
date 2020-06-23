@@ -8,7 +8,7 @@ use std::io::{self, Read};
 use std::ptr;
 
 use log::{error, info};
-use simplelog::{Config, LevelFilter, TerminalMode, TermLogger};
+use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use thiserror::Error;
 use winapi::{
     shared::minwindef::{BOOL, DWORD, HINSTANCE, LPVOID, TRUE},
@@ -66,21 +66,45 @@ unsafe fn find_globals() -> Result<(), Error> {
     let _time = TimeIt::new("find globals");
 
     let game = Module::from("BorderlandsPreSequel.exe")?;
-    
+
     let names_pattern = [
-        Some(0x66), Some(0x0F), Some(0xEF), Some(0xC0), Some(0x66), Some(0x0F), Some(0xD6), Some(0x05),
-        None, None, None, None,
+        Some(0x66),
+        Some(0x0F),
+        Some(0xEF),
+        Some(0xC0),
+        Some(0x66),
+        Some(0x0F),
+        Some(0xD6),
+        Some(0x05),
+        None,
+        None,
+        None,
+        None,
     ];
 
-    let global_names = game.find_pattern(&names_pattern).ok_or(Error::NamesNotFound)?;
+    let global_names = game
+        .find_pattern(&names_pattern)
+        .ok_or(Error::NamesNotFound)?;
     let global_names = (global_names + 8) as *const *const Names;
     let global_names = global_names.read_unaligned();
     GLOBAL_NAMES = global_names;
     info!("GLOBAL_NAMES = {:?}", GLOBAL_NAMES);
 
-    let objects_pattern = [Some(0x8B), Some(0x0D), None, None, None, None, Some(0x8B), Some(0x34), Some(0xB9)];
+    let objects_pattern = [
+        Some(0x8B),
+        Some(0x0D),
+        None,
+        None,
+        None,
+        None,
+        Some(0x8B),
+        Some(0x34),
+        Some(0xB9),
+    ];
 
-    let global_objects = game.find_pattern(&objects_pattern).ok_or(Error::ObjectsNotFound)?;
+    let global_objects = game
+        .find_pattern(&objects_pattern)
+        .ok_or(Error::ObjectsNotFound)?;
     let global_objects = (global_objects + 2) as *const *const Objects;
     let global_objects = global_objects.read_unaligned();
     GLOBAL_OBJECTS = global_objects;
@@ -107,7 +131,7 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
         info!("Initialized logger.");
 
         let _time = TimeIt::new("run()");
-        
+
         if let Err(e) = run() {
             error!("{}", e);
         }
@@ -128,7 +152,14 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
 unsafe extern "system" fn DllMain(dll: HINSTANCE, reason: DWORD, _: LPVOID) -> BOOL {
     if reason == DLL_PROCESS_ATTACH {
         DisableThreadLibraryCalls(dll);
-        CreateThread(ptr::null_mut(), 0, Some(on_attach), dll.cast(), 0, ptr::null_mut());
+        CreateThread(
+            ptr::null_mut(),
+            0,
+            Some(on_attach),
+            dll.cast(),
+            0,
+            ptr::null_mut(),
+        );
     }
 
     TRUE

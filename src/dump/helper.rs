@@ -1,5 +1,5 @@
-use crate::GLOBAL_OBJECTS;
 use crate::game::{Class, Object};
+use crate::GLOBAL_OBJECTS;
 
 use std::borrow::Cow;
 
@@ -23,7 +23,7 @@ pub unsafe fn resolve_duplicate(object: *const Object) -> Result<Cow<'static, st
         "EFlightMode",
         "CheckpointRecord",
         "TerrainWeightedMaterial",
-        "ProjectileBehaviorSequenceStateData"
+        "ProjectileBehaviorSequenceStateData",
     ];
 
     let name = get_name(object)?;
@@ -52,7 +52,7 @@ pub unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
 
 pub unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
     Ok((*GLOBAL_OBJECTS)
-            .find(class)
-            .map(|o| o.cast())
-            .ok_or(Error::StaticClassNotFound(class))?)
+        .find(class)
+        .map(|o| o.cast())
+        .ok_or(Error::StaticClassNotFound(class))?)
 }

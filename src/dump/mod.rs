@@ -1,6 +1,6 @@
-use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
-use crate::game::{BoolProperty, cast, Class, Const, Enum, Object, Property, Struct};
+use crate::game::{cast, BoolProperty, Class, Const, Enum, Object, Property, Struct};
 use crate::TimeIt;
+use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ use bitfield::{Bitfields, PostAddInstruction};
 mod helper;
 
 mod property_info;
-use property_info::{BOOL_PROPERTY, PropertyInfo};
+use property_info::{PropertyInfo, BOOL_PROPERTY};
 
 static mut CLASS: *const Class = ptr::null();
 static mut CONSTANT: *const Class = ptr::null();
@@ -36,7 +36,7 @@ pub enum Error {
 
     #[error("helper error: {0}")]
     Helper(#[from] helper::Error),
-    
+
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 
@@ -82,7 +82,7 @@ pub unsafe fn _objects() -> Result<(), Error> {
     for object in (*GLOBAL_OBJECTS).iter() {
         let address = object as usize;
         let object = &*object;
-        
+
         if let Some(name) = object.full_name() {
             writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
         }
@@ -93,7 +93,7 @@ pub unsafe fn _objects() -> Result<(), Error> {
 
 pub unsafe fn sdk() -> Result<(), Error> {
     const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk.rs";
-    
+
     let _time = TimeIt::new("sdk()");
 
     find_static_classes()?;
@@ -127,11 +127,12 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     Ok(())
 }
 
-
 fn add_crate_attributes(scope: &mut Scope) {
-    scope.raw("#![allow(dead_code)]\n\
+    scope.raw(
+        "#![allow(dead_code)]\n\
                #![allow(non_camel_case_types)]\n\
-               #![allow(non_snake_case)]");
+               #![allow(non_snake_case)]",
+    );
 }
 
 fn add_imports(scope: &mut Scope) {
@@ -160,7 +161,7 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
         // Construct a printable string.
         let value: OsString = (*object).value.to_string();
         let mut value: String = value.into_string().map_err(Error::StringConversion)?;
-        
+
         // The strings in memory are C strings, so they have null terminators that
         // Rust strings don't care for.
         // Get rid of that null-terminator so we don't see a funky '?' in the human-
@@ -178,11 +179,11 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     let name = helper::resolve_duplicate(object)?;
-    
+
     if name.starts_with("Default__") {
         return Ok(());
     }
-    
+
     let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
 
     let object: *const Enum = object.cast();
@@ -192,10 +193,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
     for variant in (*object).variants() {
         let variant = variant.ok_or(Error::BadVariant(object))?;
 
-        let count = counts
-            .entry(variant)
-            .and_modify(|c| *c += 1)
-            .or_default();
+        let count = counts.entry(variant).and_modify(|c| *c += 1).or_default();
 
         if *count == 0 {
             enum_gen.new_variant(variant);
@@ -213,10 +211,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     let structure: *const Struct = object.cast();
     let mut offset: u32 = 0;
     let super_class: *const Struct = (*structure).super_field.cast();
-    let struct_gen = sdk
-        .new_struct(&name)
-        .repr("C")
-        .vis("pub");
+    let struct_gen = sdk.new_struct(&name).repr("C").vis("pub");
 
     let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
         None
@@ -242,14 +237,14 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     if let Some(super_class) = super_class {
         add_deref_impls(sdk, &name, super_class);
     }
-    
+
     Ok(())
 }
 
 unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
     let properties = iter::successors(
         (*structure).children.cast::<Property>().as_ref(),
-        |property| property.next.cast::<Property>().as_ref()
+        |property| property.next.cast::<Property>().as_ref(),
     );
 
     let mut properties: Vec<&Property> = properties
@@ -258,8 +253,8 @@ unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static 
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
         .collect();
 
-    properties.sort_by(|p, q| 
-        p.offset.cmp(&q.offset).then_with(||
+    properties.sort_by(|p, q| {
+        p.offset.cmp(&q.offset).then_with(|| {
             if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
                 let p: &BoolProperty = cast(p);
                 let q: &BoolProperty = cast(q);
@@ -267,13 +262,17 @@ unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static 
             } else {
                 Ordering::Equal
             }
-        )
-    );
+        })
+    });
 
     properties
 }
 
-unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: Vec<&Property>) -> Result<Bitfields, Error> {
+unsafe fn add_fields(
+    struct_gen: &mut StructGen,
+    offset: &mut u32,
+    properties: Vec<&Property>,
+) -> Result<Bitfields, Error> {
     let mut bitfields = Bitfields::new();
     let mut counts: HashMap<&str, usize> = HashMap::with_capacity(properties.len());
 
@@ -296,11 +295,10 @@ unsafe fn add_fields(struct_gen: &mut StructGen, offset: &mut u32, properties: V
         if property.is(BOOL_PROPERTY) {
             let property: &BoolProperty = cast(property);
 
-            
             if bitfields.add(property.offset, name) == PostAddInstruction::Skip {
                 continue;
             }
-            
+
             name = bitfield::FIELD;
         }
 
@@ -348,8 +346,7 @@ unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
 }
 
 fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
-    sdk
-        .new_impl(derived_name)
+    sdk.new_impl(derived_name)
         .impl_trait("Deref")
         .associate_type("Target", base_name)
         .new_fn("deref")
@@ -357,8 +354,7 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .ret("&Self::Target")
         .line("&self.base");
 
-    sdk
-        .new_impl(derived_name)
+    sdk.new_impl(derived_name)
         .impl_trait("DerefMut")
         .new_fn("deref_mut")
         .arg_mut_self()

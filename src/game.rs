@@ -1,6 +1,6 @@
 use crate::GLOBAL_NAMES;
 
-use std::ffi::{CStr, OsString, c_void};
+use std::ffi::{c_void, CStr, OsString};
 use std::iter;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
@@ -32,8 +32,7 @@ pub fn set_bit(bitfield: &mut u32, bit: u8, value: bool) {
 
 impl Objects {
     pub unsafe fn find(&self, full_name: &str) -> Option<*const Object> {
-        self
-            .iter()
+        self.iter()
             .find(|&o| (*o).full_name().map_or(false, |n| n == full_name))
             .map(|o| o as *const Object)
     }
@@ -50,9 +49,7 @@ impl<T> Deref for Array<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
-        unsafe {
-            slice::from_raw_parts(self.data, self.count as usize)
-        }
+        unsafe { slice::from_raw_parts(self.data, self.count as usize) }
     }
 }
 
@@ -131,9 +128,12 @@ impl Object {
     }
 
     pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Class> {
-        iter::successors(self.class.as_ref(), |current| current.super_field
-            .as_ref()
-            .map(|field| cast::<Class>(field)))
+        iter::successors(self.class.as_ref(), |current| {
+            current
+                .super_field
+                .as_ref()
+                .map(|field| cast::<Class>(field))
+        })
     }
 
     pub unsafe fn name(&self) -> Option<&str> {
@@ -225,9 +225,7 @@ pub struct Enum {
 
 impl Enum {
     pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
-        self.variants
-            .iter()
-            .map(|n| n.name())
+        self.variants.iter().map(|n| n.name())
     }
 }
 
@@ -466,7 +464,7 @@ impl DerefMut for InterfaceProperty {
 #[repr(C)]
 pub struct ScriptInterface {
     pub object: *mut Object,
-	pub interface: *mut c_void,
+    pub interface: *mut c_void,
 }
 
 #[repr(C)]
