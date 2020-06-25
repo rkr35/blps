@@ -11,7 +11,7 @@ use std::io::{self, BufWriter, Write};
 use std::iter;
 use std::ptr;
 
-use codegen::{Scope, Struct as StructGen};
+use codegen::{Field, Scope, Struct as StructGen, Type};
 use log::info;
 use thiserror::Error;
 
@@ -324,12 +324,21 @@ unsafe fn add_fields(
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
         }
 
-        struct_gen.field(&field_name, field_type.as_ref());
+        emit_field(struct_gen, &field_name, field_type.as_ref(), property.offset, total_property_size);
 
         *offset = property.offset + total_property_size;
     }
 
     Ok(bitfields)
+}
+
+fn emit_field<T: Into<Type>>(struct_gen: &mut StructGen, name: &str, typ: T, offset: u32, length: u32) {
+    let mut field = Field::new(name, typ);
+
+    let comment = format!("\n// {:#x}({:#x})", offset, length);
+    field.annotation([comment.as_ref()].into());
+    
+    struct_gen.push_field(field);
 }
 
 fn scrub_reserved_name(name: &str) -> &str {
