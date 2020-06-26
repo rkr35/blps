@@ -11,7 +11,7 @@ use std::io::{self, BufWriter, Write};
 use std::iter;
 use std::ptr;
 
-use codegen::{Scope, Struct as StructGen};
+use codegen::{Field, Scope, Struct as StructGen, Type};
 use log::info;
 use thiserror::Error;
 
@@ -217,9 +217,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         None
     } else {
         offset = (*super_class).property_size.into();
-
         let super_name = helper::get_name(super_class.cast())?;
-        struct_gen.field("base", super_name);
+        emit_field(struct_gen, "base", super_name, 0, offset);
         Some(super_name)
     };
 
@@ -324,12 +323,21 @@ unsafe fn add_fields(
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
         }
 
-        struct_gen.field(&field_name, field_type.as_ref());
+        emit_field(struct_gen, &field_name, field_type.as_ref(), property.offset, total_property_size);
 
         *offset = property.offset + total_property_size;
     }
 
     Ok(bitfields)
+}
+
+fn emit_field<T: Into<Type>>(struct_gen: &mut StructGen, name: &str, typ: T, offset: u32, length: u32) {
+    let mut field = Field::new(name, typ);
+
+    let comment = format!("\n// {:#x}({:#x})", offset, length);
+    field.annotation([comment.as_ref()].into());
+    
+    struct_gen.push_field(field);
 }
 
 fn scrub_reserved_name(name: &str) -> &str {
@@ -342,7 +350,7 @@ fn scrub_reserved_name(name: &str) -> &str {
 unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
     let name = format!("pad_at_{:#x}", offset);
     let typ = format!("[u8; {:#x}]", size);
-    struct_gen.field(&name, typ);
+    emit_field(struct_gen, &name, typ, offset, size);
 }
 
 fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
