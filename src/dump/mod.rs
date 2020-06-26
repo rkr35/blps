@@ -225,10 +225,25 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         Some(super_name)
     };
 
+    let structure_size = (*structure).property_size.into();
+    
+    {
+        let doc;
+        let full_name = helper::get_full_name(object)?;
+        
+        if super_class.is_some() {
+            let relative_size = structure_size - offset;
+            doc = format!("{}, {:#x} ({:#x} - {:#x})", full_name, relative_size, structure_size, offset);
+        } else {
+            doc = format!("{}, {:#x}", full_name, structure_size);
+        }
+
+        struct_gen.doc(&doc);
+    }
+
     let properties = get_properties(structure, offset);
     let bitfields = add_fields(struct_gen, &mut offset, properties)?;
 
-    let structure_size = (*structure).property_size.into();
 
     if offset < structure_size {
         add_padding(struct_gen, offset, structure_size - offset);

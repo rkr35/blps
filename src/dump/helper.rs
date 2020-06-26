@@ -50,6 +50,10 @@ pub unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
     Ok((*object).name().ok_or(Error::NullName(object))?)
 }
 
+pub unsafe fn get_full_name(object: *const Object) -> Result<String, Error> {
+    Ok((*object).full_name().ok_or(Error::NullName(object))?)
+}
+
 pub unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
     Ok((*GLOBAL_OBJECTS)
         .find(class)
