@@ -217,9 +217,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         None
     } else {
         offset = (*super_class).property_size.into();
-
         let super_name = helper::get_name(super_class.cast())?;
-        struct_gen.field("base", super_name);
+        emit_field(struct_gen, "base", super_name, 0, offset);
         Some(super_name)
     };
 
