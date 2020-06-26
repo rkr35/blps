@@ -226,14 +226,17 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     };
 
     let structure_size = (*structure).property_size.into();
-    
+
     {
         let doc;
         let full_name = helper::get_full_name(object)?;
-        
+
         if super_class.is_some() {
             let relative_size = structure_size - offset;
-            doc = format!("{}, {:#x} ({:#x} - {:#x})", full_name, relative_size, structure_size, offset);
+            doc = format!(
+                "{}, {:#x} ({:#x} - {:#x})",
+                full_name, relative_size, structure_size, offset
+            );
         } else {
             doc = format!("{}, {:#x}", full_name, structure_size);
         }
@@ -243,7 +246,6 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
 
     let properties = get_properties(structure, offset);
     let bitfields = add_fields(struct_gen, &mut offset, properties)?;
-
 
     if offset < structure_size {
         add_padding(struct_gen, offset, structure_size - offset);
@@ -341,7 +343,13 @@ unsafe fn add_fields(
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
         }
 
-        emit_field(struct_gen, &field_name, field_type.as_ref(), property.offset, total_property_size);
+        emit_field(
+            struct_gen,
+            &field_name,
+            field_type.as_ref(),
+            property.offset,
+            total_property_size,
+        );
 
         *offset = property.offset + total_property_size;
     }
@@ -349,12 +357,18 @@ unsafe fn add_fields(
     Ok(bitfields)
 }
 
-fn emit_field<T: Into<Type>>(struct_gen: &mut StructGen, name: &str, typ: T, offset: u32, length: u32) {
+fn emit_field<T: Into<Type>>(
+    struct_gen: &mut StructGen,
+    name: &str,
+    typ: T,
+    offset: u32,
+    length: u32,
+) {
     let mut field = Field::new(name, typ);
 
     let comment = format!("\n// {:#x}({:#x})", offset, length);
     field.annotation([comment.as_ref()].into());
-    
+
     struct_gen.push_field(field);
 }
 
