@@ -209,8 +209,11 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     let name = helper::resolve_duplicate(object)?;
 
     let structure: *const Struct = object.cast();
+
     let mut offset: u32 = 0;
+
     let super_class: *const Struct = (*structure).super_field.cast();
+
     let struct_gen = sdk.new_struct(&name).repr("C").vis("pub");
 
     let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
