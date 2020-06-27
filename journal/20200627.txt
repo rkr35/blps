@@ -92,7 +92,7 @@ So here's the entire process for finding the address of ProcessEvent:
     Call that immediate I.
 4. Offset B by four bytes to get the address of the instruction following the
     CALL instruction. Call that address C.
-5. The address of ProcessEvent is B + I, where '+' is a wrapping add.
+5. The address of ProcessEvent is C + I, where '+' is a wrapping add.
 
 * We need to do an unaligned pointer read of four bytes because there is no
 guarantee that B is aligned to four bytes; in general, we cannot assume the
@@ -107,7 +107,7 @@ process to the current game instance:
 3. I = *B = 0xFFFF8E3D.
 4. C = B + 4 = 0x1154BAF‬ + 4 = 0x1154BB3.‬
 5. ProcessEvent
-    = B + I where '+' is wrapping add
+    = C + I where '+' is wrapping add
     = 0x1154BB3 + 0xFFFF8E3D where '+' is wrapping add
     = 0x114D9F0.
 
