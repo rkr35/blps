@@ -1,0 +1,11 @@
+Today I want to hook ProcessEvent and try to print out all the unique events
+that'll go through the hook.
+
+I first need to find a signature for the ProcessEvent function. Finding this
+signature should be easy because I already have comments set up in x32dbg at the
+function prologue of ProcessEvent. I'm going to first look for places where the
+address of ProcessEvent is hardcoded into the .text section or stored in a
+global variable, where the former is how I pattern search for global names and
+global objects. If I can't find a pointer to ProcessEvent through those two
+searches, I'll try to construct a unique signature from the ProcessEvent
+implementation itself.
