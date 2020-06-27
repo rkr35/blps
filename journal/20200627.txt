@@ -134,3 +134,12 @@ edx: unused,
 esp+4: function
 esp+8: parameters
 esp+c: return_value
+
+I added code to print the unique events going through ProcessEvent. That code
+assumes that multiple threads won't call ProcessEvent at the same time, which is
+an assumption that I haven't verified yet, although I have code from the
+Sven Co-op hook that makes that verification easy to do.
+
+The next step would be to introduce features in Cargo.toml to separate the SDK
+generator from the hook. Right now, I'm running the hook right after generating
+the SDK.
