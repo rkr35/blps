@@ -10,7 +10,7 @@ use std::mem;
 use std::ptr;
 
 use detours_sys::{DetourTransactionBegin, DetourUpdateThread, DetourAttach, DetourDetach, DetourTransactionCommit};
-use log::{error, info};
+use log::{error, info, warn};
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use thiserror::Error;
 use winapi::{
@@ -169,7 +169,20 @@ unsafe fn unhook_process_event() {
 unsafe extern "fastcall" fn my_process_event(this: &game::Object, edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void) {
     type ProcessEvent = unsafe extern "fastcall" fn (this: &game::Object, _edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void);
 
-    info!("my_process_event");
+    if let Some(full_name) = function.full_name() {
+        use std::collections::HashSet;
+        static mut UNIQUE_EVENTS: Option<HashSet<String>> = None;
+
+        if let Some(set) = UNIQUE_EVENTS.as_mut() {
+            if set.insert(full_name.clone()) {
+                info!("{}", full_name);
+            }
+        } else {
+            UNIQUE_EVENTS = Some(HashSet::new());
+        }
+    } else {
+        warn!("couldn't get full name");
+    }
 
     let original = mem::transmute::<*mut c_void, ProcessEvent>(PROCESS_EVENT);
     original(this, edx, function, parameters, return_value);
