@@ -4,9 +4,12 @@
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 compile_error!("You must compile this crate as a 32-bit Windows .DLL.");
 
+use std::ffi::c_void;
 use std::io::{self, Read};
+use std::mem;
 use std::ptr;
 
+use detours_sys::{DetourTransactionBegin, DetourUpdateThread, DetourAttach, DetourDetach, DetourTransactionCommit};
 use log::{error, info};
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use thiserror::Error;
@@ -15,7 +18,7 @@ use winapi::{
     um::{
         consoleapi::AllocConsole,
         libloaderapi::{DisableThreadLibraryCalls, FreeLibraryAndExitThread},
-        processthreadsapi::CreateThread,
+        processthreadsapi::{CreateThread, GetCurrentThread},
         synchapi::Sleep,
         wincon::FreeConsole,
         winnt::DLL_PROCESS_ATTACH,
@@ -40,7 +43,7 @@ mod sdk;
 
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
-pub static mut PROCESS_EVENT: *const usize = ptr::null();
+pub static mut PROCESS_EVENT: *mut c_void = ptr::null_mut();
 
 fn idle() {
     println!("Idling. Press enter to continue.");
@@ -113,7 +116,7 @@ unsafe fn find_global_objects(game: &Module) -> Result<*const Objects, Error> {
     Ok(global_objects.read_unaligned())
 }
 
-unsafe fn find_process_event(game: &Module) -> Result<*const usize, Error> {
+unsafe fn find_process_event(game: &Module) -> Result<*mut c_void, Error> {
     const PATTERN: [Option<u8>; 15] = [Some(0x50), Some(0x51), Some(0x52), Some(0x8B), Some(0xCE), Some(0xE8), None, None, None, None, Some(0x5E), Some(0x5D), Some(0xC2), Some(0x0C), Some(0x00)];
 
     // 1. Find the first address A that matches the above pattern.
@@ -129,7 +132,7 @@ unsafe fn find_process_event(game: &Module) -> Result<*const usize, Error> {
     let c = b + 4;
 
     // 5. The address of ProcessEvent is C + I, where '+' is a wrapping add.
-    Ok(c.wrapping_add(i) as *const usize)
+    Ok(c.wrapping_add(i) as *mut _)
 }
 
 unsafe fn find_globals() -> Result<(), Error> {
@@ -149,11 +152,41 @@ unsafe fn find_globals() -> Result<(), Error> {
     Ok(())
 }
 
+unsafe fn hook_process_event() {
+    DetourTransactionBegin();
+    DetourUpdateThread(GetCurrentThread());
+    DetourAttach(&mut PROCESS_EVENT, my_process_event as *mut _);
+    DetourTransactionCommit();
+}
+
+unsafe fn unhook_process_event() {
+    DetourTransactionBegin();
+    DetourUpdateThread(GetCurrentThread());
+    DetourDetach(&mut PROCESS_EVENT, my_process_event as *mut _);
+    DetourTransactionCommit();
+}
+
+unsafe extern "fastcall" fn my_process_event(this: &game::Object, edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void) {
+    type ProcessEvent = unsafe extern "fastcall" fn (this: &game::Object, _edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void);
+
+    info!("my_process_event");
+
+    let original = mem::transmute::<*mut c_void, ProcessEvent>(PROCESS_EVENT);
+    original(this, edx, function, parameters, return_value);
+}
+
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
     // dump::names()?;
     // dump::objects()?;
     dump::sdk()?;
+
+    hook_process_event();
+    
+    idle();
+
+    unhook_process_event();
+
     Ok(())
 }
 

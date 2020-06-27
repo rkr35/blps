@@ -115,3 +115,22 @@ Great, so let's put that into code.
 
 Issue#5 is an imperative to hook ProcessEvent. I'll create a separate
 "hook_process_event" branch that I can place into a PR that links #5.
+
+Okay, the injected .DLL was able to find the ProcessEvent address. I'm going to
+write a messy ProcessEvent hook that will print out the unique events that go
+through the function.
+
+I got that hook working, although it's currently only printing
+"my_process_event".
+
+I'm using the `fastcall` calling convention since ProcessEvent is a virtual
+function using the `thiscall` calling convention, but Rust doesn't have a stable
+`thiscall`, so I need to use `fastcall` to access the `this` pointer (the
+UObject that's calling ProcessEvent), which is stored in ecx.
+
+So my detoured function's arguments are at:
+ecx: this,
+edx: unused,
+esp+4: function
+esp+8: parameters
+esp+c: return_value
