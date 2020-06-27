@@ -62,12 +62,8 @@ enum Error {
     ObjectsNotFound,
 }
 
-unsafe fn find_globals() -> Result<(), Error> {
-    let _time = TimeIt::new("find globals");
-
-    let game = Module::from("BorderlandsPreSequel.exe")?;
-
-    let names_pattern = [
+unsafe fn find_global_names(game: &Module) -> Result<*const Names, Error> {
+    const PATTERN: [Option<u8>; 12] = [
         Some(0x66),
         Some(0x0F),
         Some(0xEF),
@@ -83,14 +79,16 @@ unsafe fn find_globals() -> Result<(), Error> {
     ];
 
     let global_names = game
-        .find_pattern(&names_pattern)
+        .find_pattern(&PATTERN)
         .ok_or(Error::NamesNotFound)?;
-    let global_names = (global_names + 8) as *const *const Names;
-    let global_names = global_names.read_unaligned();
-    GLOBAL_NAMES = global_names;
-    info!("GLOBAL_NAMES = {:?}", GLOBAL_NAMES);
 
-    let objects_pattern = [
+    let global_names = (global_names + 8) as *const *const Names;
+
+    Ok(global_names.read_unaligned())
+}
+
+unsafe fn find_global_objects(game: &Module) -> Result<*const Objects, Error> {
+    const PATTERN: [Option<u8>; 9] = [
         Some(0x8B),
         Some(0x0D),
         None,
@@ -103,11 +101,23 @@ unsafe fn find_globals() -> Result<(), Error> {
     ];
 
     let global_objects = game
-        .find_pattern(&objects_pattern)
+        .find_pattern(&PATTERN)
         .ok_or(Error::ObjectsNotFound)?;
+
     let global_objects = (global_objects + 2) as *const *const Objects;
-    let global_objects = global_objects.read_unaligned();
-    GLOBAL_OBJECTS = global_objects;
+    
+    Ok(global_objects.read_unaligned())
+}
+
+unsafe fn find_globals() -> Result<(), Error> {
+    let _time = TimeIt::new("find globals");
+
+    let game = Module::from("BorderlandsPreSequel.exe")?;
+
+    GLOBAL_NAMES = find_global_names(&game)?;
+    info!("GLOBAL_NAMES = {:?}", GLOBAL_NAMES);
+
+    GLOBAL_OBJECTS = find_global_objects(&game)?;
     info!("GLOBAL_OBJECTS = {:?}", GLOBAL_OBJECTS);
 
     Ok(())
