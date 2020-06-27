@@ -112,3 +112,6 @@ process to the current game instance:
     = 0x114D9F0.
 
 Great, so let's put that into code.
+
+Issue#5 is an imperative to hook ProcessEvent. I'll create a separate
+"hook_process_event" branch that I can place into a PR that links #5.

@@ -40,6 +40,7 @@ mod sdk;
 
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
+pub static mut PROCESS_EVENT: *const usize = ptr::null();
 
 fn idle() {
     println!("Idling. Press enter to continue.");
@@ -60,6 +61,9 @@ enum Error {
 
     #[error("cannot find global objects")]
     ObjectsNotFound,
+
+    #[error("cannot find ProcessEvent")]
+    ProcessEventNotFound,
 }
 
 unsafe fn find_global_names(game: &Module) -> Result<*const Names, Error> {
@@ -109,6 +113,25 @@ unsafe fn find_global_objects(game: &Module) -> Result<*const Objects, Error> {
     Ok(global_objects.read_unaligned())
 }
 
+unsafe fn find_process_event(game: &Module) -> Result<*const usize, Error> {
+    const PATTERN: [Option<u8>; 15] = [Some(0x50), Some(0x51), Some(0x52), Some(0x8B), Some(0xCE), Some(0xE8), None, None, None, None, Some(0x5E), Some(0x5D), Some(0xC2), Some(0x0C), Some(0x00)];
+
+    // 1. Find the first address A that matches the above pattern.
+    let a = game.find_pattern(&PATTERN).ok_or(Error::ProcessEventNotFound)?;
+
+    // 2. Offset A by six bytes to get the address of the CALL immediate. Call that address B.
+    let b = a + 6;
+
+    // 3. Do an unaligned* usize pointer read operation on B to get the call immediate. Call that immediate I.
+    let i = (b as *const usize).read_unaligned();
+
+    // 4. Offset B by four bytes to get the address of the instruction following the CALL instruction. Call that address C.
+    let c = b + 4;
+
+    // 5. The address of ProcessEvent is C + I, where '+' is a wrapping add.
+    Ok(c.wrapping_add(i) as *const usize)
+}
+
 unsafe fn find_globals() -> Result<(), Error> {
     let _time = TimeIt::new("find globals");
 
@@ -119,6 +142,9 @@ unsafe fn find_globals() -> Result<(), Error> {
 
     GLOBAL_OBJECTS = find_global_objects(&game)?;
     info!("GLOBAL_OBJECTS = {:?}", GLOBAL_OBJECTS);
+
+    PROCESS_EVENT = find_process_event(&game)?;
+    info!("PROCESS_EVENT = {:?}", PROCESS_EVENT);
 
     Ok(())
 }
