@@ -379,7 +379,7 @@ fn scrub_reserved_name(name: &str) -> &str {
     }
 }
 
-unsafe fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
+fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
     let name = format!("pad_at_{:#x}", offset);
     let typ = format!("[u8; {:#x}]", size);
     emit_field(struct_gen, &name, typ, offset, size);
