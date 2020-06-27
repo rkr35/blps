@@ -9,3 +9,106 @@ global variable, where the former is how I pattern search for global names and
 global objects. If I can't find a pointer to ProcessEvent through those two
 searches, I'll try to construct a unique signature from the ProcessEvent
 implementation itself.
+
+0x114D9F0 is the address of ProcessEvent for the current game instance I have
+running. I'll do a scan in Cheat Engine (CE) for that address, making sure to
+expand the memory start and stop ranges and making sure to tell CE that we
+don't care about the found addresses being writable, copy-on-write, or
+executable.
+
+I found 1994 results for 0x114D9F0, 1993 of which are pointers and the last is
+in an audio module's .text section that happened to have "F0 D9 14 01" as part
+of a sequence of instructions, i.e., not useful to finding ProcessEvent.
+
+I tried to find out what accessed the first found address, but the game crashed.
+I forgot there's some kind of anti-debugging. I've been using the ScyllaHide
+plugin with x32dbg to debug with abandon. I don't want to spend too much time
+looking into which anti-debug protections are in place, so I'm going to inject
+the ScyllaHide standalone .DLL to debug with Cheat Engine. I could also copy
+over the addresses from Cheat Engine into x32dbg that I want to look at, but
+it's not as convenient as working through Cheat Engine in the first place.
+
+The game is still crashing after injecting the ScyllaHide standalone .DLL and
+attaching a breakpoint through Cheat Engine. I noticed that the game also
+crashes in x32dbg if I attach the debugger after the game booted. If I start the
+game using x32dbg, however, with all the options selected in ScyllaHide, then I
+can debug freely. So I think ScyllaHide is hooking some API that is critical
+before the game can initialize its anti-debugging mechanism? I don't know, and
+after some time, it may be more time-effective to actually go hunting for all
+the anti-debugs.
+
+I'll work through x32dbg for now. 0x114D9F0 is still ProcessEvent.
+
+Oh wow, there's actually a simpler way in x32dbg to find where in the .text
+section an instruction is referencing 0x114D9F0.
+
+1. Go to 0x114D9F0 in the disassembly.
+
+2. Right-click on the instruction and select 
+    "Find references to -> Select Address(es)".
+
+3. There's a single direct CALL to 0x114D9F0.
+
+01154BAE | E8 3D8EFFFF              | call <borderlandspresequel.sub_114D9F0>
+
+Why didn't I find this instruction when I originally did a search in Cheat
+Engine? Because the immediate operand to the CALL instruction is an offset from
+the instruction following the CALL. In this case, the immediate operand is
+"3D8EFFFF" which is little-endian for "-29123". The address of the instruction
+following the CALL is 0x1154BB3. So the CALL instruction resolves to
+0x1154BB3 - 29123 = 0x114D9F0‬, which is our ProcessEvent address. Nowhere in
+the disassembly do we see the bytes "F0 D9 14 01", which are the bytes
+Cheat Engine was doing a literal scan for.
+
+Great, so now we need a signature for this CALL instruction.
+
+Here's the surrounding disassembly:
+push eax
+push ecx
+push edx
+mov ecx,esi
+call <borderlandspresequel.sub_114D9F0>
+pop esi
+pop ebp
+ret C
+
+And here are the bytes for the disassembly:
+50 51 52 8B CE E8 3D 8E FF FF 5E 5D C2 0C 00
+
+We know the "3D 8E FF FF" is the offset that's liable to change between game
+patches, so we'll have to wildcard those four bytes.
+
+50 51 52 8B CE E8 ?? ?? ?? ?? 5E 5D C2 0C 00
+
+Searching for that pattern in Cheat Engine, I find two addresses. Luckily, the
+address we're looking for is smaller than the other found address, so we can
+do a linear search for this pattern and stop at the first found result.
+
+So here's the entire process for finding the address of ProcessEvent:
+1. Find the first address A that matches the above pattern.
+2. Offset A by six bytes to get the address of the CALL immediate.
+    Call that address B.
+3. Do an unaligned* usize pointer read operation on B to get the call immediate.
+    Call that immediate I.
+4. Offset B by four bytes to get the address of the instruction following the
+    CALL instruction. Call that address C.
+5. The address of ProcessEvent is B + I, where '+' is a wrapping add.
+
+* We need to do an unaligned pointer read of four bytes because there is no
+guarantee that B is aligned to four bytes; in general, we cannot assume the
+addresses of operands in .text are more stictly-aligned than a trivial one
+byte alignment.
+
+Here's what we get for the address of ProcessEvent by applying that above
+process to the current game instance:
+
+1. A = 0x01154BA9.
+2. B = A + 6 = 0x01154BA9 + 6 = 0x1154BAF‬.
+3. I = *B = 0xFFFF8E3D.
+4. C = B + 4 = 0x1154BAF‬ + 4 = 0x1154BB3.‬
+5. ProcessEvent
+    = B + I where '+' is wrapping add
+    = 0x1154BB3 + 0xFFFF8E3D where '+' is wrapping add
+    = 0x114D9F0.
+
+Great, so let's put that into code.
