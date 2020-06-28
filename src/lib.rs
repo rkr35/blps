@@ -6,10 +6,8 @@ compile_error!("You must compile this crate as a 32-bit Windows .DLL.");
 
 use std::ffi::c_void;
 use std::io::{self, Read};
-use std::mem;
 use std::ptr;
 
-use detours_sys::{DetourTransactionBegin, DetourUpdateThread, DetourAttach, DetourDetach, DetourTransactionCommit};
 use log::{error, info, warn};
 use simplelog::{Config, LevelFilter, TermLogger, TerminalMode};
 use thiserror::Error;
@@ -18,7 +16,7 @@ use winapi::{
     um::{
         consoleapi::AllocConsole,
         libloaderapi::{DisableThreadLibraryCalls, FreeLibraryAndExitThread},
-        processthreadsapi::{CreateThread, GetCurrentThread},
+        processthreadsapi::CreateThread,
         synchapi::Sleep,
         wincon::FreeConsole,
         winnt::DLL_PROCESS_ATTACH,
@@ -29,6 +27,8 @@ mod dump;
 
 mod game;
 use game::{Names, Objects};
+
+mod hook;
 
 mod macros;
 
@@ -152,53 +152,16 @@ unsafe fn find_globals() -> Result<(), Error> {
     Ok(())
 }
 
-unsafe fn hook_process_event() {
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourAttach(&mut PROCESS_EVENT, my_process_event as *mut _);
-    DetourTransactionCommit();
-}
-
-unsafe fn unhook_process_event() {
-    DetourTransactionBegin();
-    DetourUpdateThread(GetCurrentThread());
-    DetourDetach(&mut PROCESS_EVENT, my_process_event as *mut _);
-    DetourTransactionCommit();
-}
-
-unsafe extern "fastcall" fn my_process_event(this: &game::Object, edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void) {
-    type ProcessEvent = unsafe extern "fastcall" fn (this: &game::Object, _edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void);
-
-    if let Some(full_name) = function.full_name() {
-        use std::collections::HashSet;
-        static mut UNIQUE_EVENTS: Option<HashSet<String>> = None;
-
-        if let Some(set) = UNIQUE_EVENTS.as_mut() {
-            if set.insert(full_name.clone()) {
-                info!("{}", full_name);
-            }
-        } else {
-            UNIQUE_EVENTS = Some(HashSet::new());
-        }
-    } else {
-        warn!("couldn't get full name");
-    }
-
-    let original = mem::transmute::<*mut c_void, ProcessEvent>(PROCESS_EVENT);
-    original(this, edx, function, parameters, return_value);
-}
-
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
     // dump::names()?;
     // dump::objects()?;
     dump::sdk()?;
 
-    hook_process_event();
-    
-    idle();
-
-    unhook_process_event();
+    {
+        let _hook = hook::Hook::new();
+        idle();
+    }
 
     Ok(())
 }

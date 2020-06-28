@@ -1,0 +1,30 @@
+Today I want to add two features to Cargo.toml, one for generating the SDK, and
+one for hooking the game.
+
+I'll have to refactor a good chunk of the code because the information that the
+SDK generator needs is mostly different from the information the hook needs,
+although both share some common code, such as a few game structures and
+functions.
+
+I'll say that generating the SDK is called "dumping". I already have a `dump`
+module in place that contains most of the generator-specific code. I imagine
+I'll have to move things in and out of that `dump` module when I create the
+`hook` module.
+
+To be more specific, here are functionalities that `hook` will need:
+    1. Access to the generated SDK.
+    2. Access to the helper methods that the SDK relies on.
+    3. Access to the handwritten game structures that the hook needs.
+    4. Access to the helper methods that the handwritten stuctures rely on.
+
+So let me create that hook module and start moving things in there.
+
+I know that module will need at least a top-level Error enum to communicate
+hooking errors to lib.rs. I also know that a RAII structure will be useful to
+set up the hook without forgetting to clean it up when we unload the .DLL.
+
+Actually, it looks like I don't need a top-level Error enum for hook just yet.
+All I'm doing right now is setting up the detours, and those are infallible.
+
+Okay, I got the hook module up, and the printing of unique events through my
+detoured ProcessEvent is still working, so the refactor went well.
