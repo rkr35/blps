@@ -56,6 +56,9 @@ enum Error {
     #[error("dump error: {0}")]
     Dump(#[from] dump::Error),
 
+    #[error("hook error: {0}")]
+    Hook(#[from] hook::Error),
+
     #[error("{0}")]
     Module(#[from] module::Error),
 
@@ -159,7 +162,7 @@ unsafe fn run() -> Result<(), Error> {
     dump::sdk()?;
 
     {
-        let _hook = hook::Hook::new();
+        let _hook = hook::Hook::new()?;
         idle();
     }
 
