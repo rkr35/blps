@@ -12,8 +12,8 @@ use winapi::um::processthreadsapi::GetCurrentThread;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("detour error: {}", .0)]
-    Detour(DetourErrorCode),
+    #[error("detour error: {0} returned {1}")]
+    Detour(&'static str, DetourErrorCode),
 }
 
 /// A helper macro to call Detour functions and wrap any error codes into a
@@ -27,7 +27,7 @@ macro_rules! det {
         if error_code == NO_ERROR {
             Ok(())
         } else {
-            Err(Error::Detour(error_code))
+            Err(Error::Detour(stringify!($call), error_code))
         }
     }}
 }
