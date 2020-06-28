@@ -23,8 +23,5 @@ I know that module will need at least a top-level Error enum to communicate
 hooking errors to lib.rs. I also know that a RAII structure will be useful to
 set up the hook without forgetting to clean it up when we unload the .DLL.
 
-Actually, it looks like I don't need a top-level Error enum for hook just yet.
-All I'm doing right now is setting up the detours, and those are infallible.
-
 Okay, I got the hook module up, and the printing of unique events through my
 detoured ProcessEvent is still working, so the refactor went well.
