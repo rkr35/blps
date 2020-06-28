@@ -136,7 +136,8 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use crate::game::{Array, FString, is_bit_set, NameIndex, ScriptDelegate, ScriptInterface, set_bit};\n\
+    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+               use crate::hook::bitfield::{is_bit_set, set_bit};\n\
                use std::ops::{Deref, DerefMut};");
 }
 

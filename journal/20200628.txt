@@ -42,3 +42,8 @@ to dedup those constants, but instead, I'm going to prepend the module and
 submodule for each constant. The module and submodule names will provide context
 as to where the constant can be used. Let me make an issue on GitHub so I don't
 forget.
+
+There are two functions that the generated SDK uses for querying and modifying
+bitfields: is_bit_set() and set_bit(). I placed those functions in game.rs, but
+since they're only used in the hook, it makes better sense to place them in a
+module under the hook module.
