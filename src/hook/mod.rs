@@ -9,6 +9,7 @@ use log::{error, info, warn};
 use thiserror::Error;
 use winapi::um::processthreadsapi::GetCurrentThread;
 
+mod sdk;
 
 #[derive(Error, Debug)]
 pub enum Error {

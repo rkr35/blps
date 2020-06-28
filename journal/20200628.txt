@@ -25,3 +25,20 @@ set up the hook without forgetting to clean it up when we unload the .DLL.
 
 Okay, I got the hook module up, and the printing of unique events through my
 detoured ProcessEvent is still working, so the refactor went well.
+
+Per (1) above, the hook module only needs access to the generated SDK. So let me
+make two changes: one, change the (hardcoded) path that the dumper places the
+generated SDK so that the sdk.rs is under the hook module; and two, include the
+sdk module in the hook module.
+
+Done. I also had to make changes to remove the old `include_sdk` feature that I
+was using to incrementally test whether the generated SDK compiles; to ignore
+the sdk.rs under the new path; and to introduce the two new features `dump` and
+`hook`.
+
+While looking at the generated sdk.rs, I noticed that a lot of constants are
+duplicated. For example, there are 14 "// WPS_MusicVolume = 107". I'm not going
+to dedup those constants, but instead, I'm going to prepend the module and
+submodule for each constant. The module and submodule names will provide context
+as to where the constant can be used. Let me make an issue on GitHub so I don't
+forget.

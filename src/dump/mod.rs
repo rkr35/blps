@@ -92,7 +92,7 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
-    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk.rs";
+    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk.rs";
 
     let _time = TimeIt::new("sdk()");
 

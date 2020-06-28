@@ -38,9 +38,6 @@ use module::Module;
 mod timeit;
 use timeit::TimeIt;
 
-#[cfg(feature = "include_sdk")]
-mod sdk;
-
 pub static mut GLOBAL_NAMES: *const Names = ptr::null();
 pub static mut GLOBAL_OBJECTS: *const Objects = ptr::null();
 pub static mut PROCESS_EVENT: *mut c_void = ptr::null_mut();

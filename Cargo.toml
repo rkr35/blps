@@ -15,7 +15,8 @@ lto = "fat"
 panic = "abort"
 
 [features]
-include_sdk = []
+hook = []
+dump = []
 
 [dependencies]
 codegen = "0.1.3"
