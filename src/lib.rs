@@ -30,8 +30,6 @@ use game::{Names, Objects};
 
 mod hook;
 
-mod macros;
-
 mod module;
 use module::Module;
 
