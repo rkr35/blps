@@ -208,12 +208,6 @@ pub struct Enum {
     pub variants: Array<NameIndex>,
 }
 
-impl Enum {
-    pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
-        self.variants.iter().map(|n| n.name())
-    }
-}
-
 impl Deref for Enum {
     type Target = Field;
 

@@ -179,6 +179,12 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+    impl Enum {
+        pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
+            self.variants.iter().map(|n| n.name())
+        }
+    }
+    
     let name = helper::resolve_duplicate(object)?;
 
     if name.starts_with("Default__") {
