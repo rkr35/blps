@@ -93,9 +93,7 @@ unsafe fn find_global_names(game: &Module) -> Result<*const Names, Error> {
         None,
     ];
 
-    let global_names = game
-        .find_pattern(&PATTERN)
-        .ok_or(Error::NamesNotFound)?;
+    let global_names = game.find_pattern(&PATTERN).ok_or(Error::NamesNotFound)?;
 
     let global_names = (global_names + 8) as *const *const Names;
 
@@ -115,20 +113,36 @@ unsafe fn find_global_objects(game: &Module) -> Result<*const Objects, Error> {
         Some(0xB9),
     ];
 
-    let global_objects = game
-        .find_pattern(&PATTERN)
-        .ok_or(Error::ObjectsNotFound)?;
+    let global_objects = game.find_pattern(&PATTERN).ok_or(Error::ObjectsNotFound)?;
 
     let global_objects = (global_objects + 2) as *const *const Objects;
-    
+
     Ok(global_objects.read_unaligned())
 }
 
 unsafe fn find_process_event(game: &Module) -> Result<*mut c_void, Error> {
-    const PATTERN: [Option<u8>; 15] = [Some(0x50), Some(0x51), Some(0x52), Some(0x8B), Some(0xCE), Some(0xE8), None, None, None, None, Some(0x5E), Some(0x5D), Some(0xC2), Some(0x0C), Some(0x00)];
+    const PATTERN: [Option<u8>; 15] = [
+        Some(0x50),
+        Some(0x51),
+        Some(0x52),
+        Some(0x8B),
+        Some(0xCE),
+        Some(0xE8),
+        None,
+        None,
+        None,
+        None,
+        Some(0x5E),
+        Some(0x5D),
+        Some(0xC2),
+        Some(0x0C),
+        Some(0x00),
+    ];
 
     // 1. Find the first address A that matches the above pattern.
-    let a = game.find_pattern(&PATTERN).ok_or(Error::ProcessEventNotFound)?;
+    let a = game
+        .find_pattern(&PATTERN)
+        .ok_or(Error::ProcessEventNotFound)?;
 
     // 2. Offset A by six bytes to get the address of the CALL immediate. Call that address B.
     let b = a + 6;
@@ -162,18 +176,20 @@ unsafe fn find_globals() -> Result<(), Error> {
 
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    
-    #[cfg(feature = "dump")] {
+
+    #[cfg(feature = "dump")]
+    {
         // dump::names()?;
         // dump::objects()?;
         dump::sdk()?;
     }
 
-    #[cfg(feature = "hook")] {
+    #[cfg(feature = "hook")]
+    {
         let _hook = hook::Hook::new()?;
         idle();
     }
-    
+
     Ok(())
 }
 

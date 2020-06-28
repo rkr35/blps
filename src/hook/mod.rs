@@ -4,7 +4,10 @@ use crate::PROCESS_EVENT;
 use std::ffi::c_void;
 use std::mem;
 
-use detours_sys::{DetourTransactionBegin, DetourUpdateThread, DetourAttach, DetourDetach, DetourTransactionCommit, LONG as DetourErrorCode};
+use detours_sys::{
+    DetourAttach, DetourDetach, DetourTransactionBegin, DetourTransactionCommit,
+    DetourUpdateThread, LONG as DetourErrorCode,
+};
 use log::{error, info, warn};
 use thiserror::Error;
 use winapi::um::processthreadsapi::GetCurrentThread;
@@ -31,7 +34,7 @@ macro_rules! det {
         } else {
             Err(Error::Detour(stringify!($call), error_code))
         }
-    }}
+    }};
 }
 
 pub struct Hook;
@@ -69,8 +72,20 @@ unsafe fn unhook_process_event() -> Result<(), Error> {
     Ok(())
 }
 
-unsafe extern "fastcall" fn my_process_event(this: &game::Object, edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void) {
-    type ProcessEvent = unsafe extern "fastcall" fn (this: &game::Object, _edx: usize, function: &game::Function, parameters: *mut c_void, return_value: *mut c_void);
+unsafe extern "fastcall" fn my_process_event(
+    this: &game::Object,
+    edx: usize,
+    function: &game::Function,
+    parameters: *mut c_void,
+    return_value: *mut c_void,
+) {
+    type ProcessEvent = unsafe extern "fastcall" fn(
+        this: &game::Object,
+        _edx: usize,
+        function: &game::Function,
+        parameters: *mut c_void,
+        return_value: *mut c_void,
+    );
 
     if let Some(full_name) = function.full_name() {
         use std::collections::HashSet;

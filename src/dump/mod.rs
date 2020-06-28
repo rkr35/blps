@@ -136,9 +136,11 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
-               use crate::hook::bitfield::{is_bit_set, set_bit};\n\
-               use std::ops::{Deref, DerefMut};");
+    scope.raw(
+        "use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+         use crate::hook::bitfield::{is_bit_set, set_bit};\n\
+         use std::ops::{Deref, DerefMut};",
+    );
 }
 
 unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
@@ -184,7 +186,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
             self.variants.iter().map(|n| n.name())
         }
     }
-    
+
     let name = helper::resolve_duplicate(object)?;
 
     if name.starts_with("Default__") {
