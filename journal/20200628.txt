@@ -1,0 +1,55 @@
+Today I want to add two features to Cargo.toml, one for generating the SDK, and
+one for hooking the game.
+
+I'll have to refactor a good chunk of the code because the information that the
+SDK generator needs is mostly different from the information the hook needs,
+although both share some common code, such as a few game structures and
+functions.
+
+I'll say that generating the SDK is called "dumping". I already have a `dump`
+module in place that contains most of the generator-specific code. I imagine
+I'll have to move things in and out of that `dump` module when I create the
+`hook` module.
+
+To be more specific, here are functionalities that `hook` will need:
+    1. Access to the generated SDK.
+    2. Access to the helper methods that the SDK relies on.
+    3. Access to the handwritten game structures that the hook needs.
+    4. Access to the helper methods that the handwritten stuctures rely on.
+
+So let me create that hook module and start moving things in there.
+
+I know that module will need at least a top-level Error enum to communicate
+hooking errors to lib.rs. I also know that a RAII structure will be useful to
+set up the hook without forgetting to clean it up when we unload the .DLL.
+
+Okay, I got the hook module up, and the printing of unique events through my
+detoured ProcessEvent is still working, so the refactor went well.
+
+Per (1) above, the hook module only needs access to the generated SDK. So let me
+make two changes: one, change the (hardcoded) path that the dumper places the
+generated SDK so that the sdk.rs is under the hook module; and two, include the
+sdk module in the hook module.
+
+Done. I also had to make changes to remove the old `include_sdk` feature that I
+was using to incrementally test whether the generated SDK compiles; to ignore
+the sdk.rs under the new path; and to introduce the two new features `dump` and
+`hook`.
+
+While looking at the generated sdk.rs, I noticed that a lot of constants are
+duplicated. For example, there are 14 "// WPS_MusicVolume = 107". I'm not going
+to dedup those constants, but instead, I'm going to prepend the module and
+submodule for each constant. The module and submodule names will provide context
+as to where the constant can be used. Let me make an issue on GitHub so I don't
+forget.
+
+There are two functions that the generated SDK uses for querying and modifying
+bitfields: is_bit_set() and set_bit(). I placed those functions in game.rs, but
+since they're only used in the hook, it makes better sense to place them in a
+module under the hook module.
+
+Okay, now I'm going to try to selectively compile the dump and hook code based
+on their respective Cargo.toml features. I also need to add a safeguard to
+prevent both features from being enabled at the same time.
+
+Done. I'm glad I was able to conditionally compile error variants as well.

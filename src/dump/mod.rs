@@ -92,7 +92,7 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
-    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\sdk.rs";
+    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk.rs";
 
     let _time = TimeIt::new("sdk()");
 
@@ -136,8 +136,11 @@ fn add_crate_attributes(scope: &mut Scope) {
 }
 
 fn add_imports(scope: &mut Scope) {
-    scope.raw("use crate::game::{Array, FString, is_bit_set, NameIndex, ScriptDelegate, ScriptInterface, set_bit};\n\
-               use std::ops::{Deref, DerefMut};");
+    scope.raw(
+        "use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+         use crate::hook::bitfield::{is_bit_set, set_bit};\n\
+         use std::ops::{Deref, DerefMut};",
+    );
 }
 
 unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
@@ -178,6 +181,12 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 }
 
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+    impl Enum {
+        pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
+            self.variants.iter().map(|n| n.name())
+        }
+    }
+
     let name = helper::resolve_duplicate(object)?;
 
     if name.starts_with("Default__") {

@@ -92,7 +92,7 @@ So here's the entire process for finding the address of ProcessEvent:
     Call that immediate I.
 4. Offset B by four bytes to get the address of the instruction following the
     CALL instruction. Call that address C.
-5. The address of ProcessEvent is B + I, where '+' is a wrapping add.
+5. The address of ProcessEvent is C + I, where '+' is a wrapping add.
 
 * We need to do an unaligned pointer read of four bytes because there is no
 guarantee that B is aligned to four bytes; in general, we cannot assume the
@@ -107,8 +107,39 @@ process to the current game instance:
 3. I = *B = 0xFFFF8E3D.
 4. C = B + 4 = 0x1154BAF‬ + 4 = 0x1154BB3.‬
 5. ProcessEvent
-    = B + I where '+' is wrapping add
+    = C + I where '+' is wrapping add
     = 0x1154BB3 + 0xFFFF8E3D where '+' is wrapping add
     = 0x114D9F0.
 
 Great, so let's put that into code.
+
+Issue#5 is an imperative to hook ProcessEvent. I'll create a separate
+"hook_process_event" branch that I can place into a PR that links #5.
+
+Okay, the injected .DLL was able to find the ProcessEvent address. I'm going to
+write a messy ProcessEvent hook that will print out the unique events that go
+through the function.
+
+I got that hook working, although it's currently only printing
+"my_process_event".
+
+I'm using the `fastcall` calling convention since ProcessEvent is a virtual
+function using the `thiscall` calling convention, but Rust doesn't have a stable
+`thiscall`, so I need to use `fastcall` to access the `this` pointer (the
+UObject that's calling ProcessEvent), which is stored in ecx.
+
+So my detoured function's arguments are at:
+ecx: this,
+edx: unused,
+esp+4: function
+esp+8: parameters
+esp+c: return_value
+
+I added code to print the unique events going through ProcessEvent. That code
+assumes that multiple threads won't call ProcessEvent at the same time, which is
+an assumption that I haven't verified yet, although I have code from the
+Sven Co-op hook that makes that verification easy to do.
+
+The next step would be to introduce features in Cargo.toml to separate the SDK
+generator from the hook. Right now, I'm running the hook right after generating
+the SDK.
