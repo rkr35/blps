@@ -4,6 +4,12 @@
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]
 compile_error!("You must compile this crate as a 32-bit Windows .DLL.");
 
+#[cfg(not(any(feature = "dump", feature = "hook")))]
+compile_error!("You must enable exactly one of these features: dump, hook");
+
+#[cfg(all(feature = "dump", feature = "hook"))]
+compile_error!("You cannot generate an SDK and hook the game at the same time. Disable a feature.");
+
 use std::ffi::c_void;
 use std::io::{self, Read};
 use std::ptr;
@@ -23,11 +29,13 @@ use winapi::{
     },
 };
 
+#[cfg(feature = "dump")]
 mod dump;
 
 mod game;
 use game::{Names, Objects};
 
+#[cfg(feature = "hook")]
 mod hook;
 
 mod module;
@@ -49,9 +57,11 @@ fn idle() {
 #[derive(Error, Debug)]
 enum Error {
     #[error("dump error: {0}")]
+    #[cfg(feature = "dump")]
     Dump(#[from] dump::Error),
 
     #[error("hook error: {0}")]
+    #[cfg(feature = "hook")]
     Hook(#[from] hook::Error),
 
     #[error("{0}")]
@@ -152,15 +162,18 @@ unsafe fn find_globals() -> Result<(), Error> {
 
 unsafe fn run() -> Result<(), Error> {
     find_globals()?;
-    // dump::names()?;
-    // dump::objects()?;
-    dump::sdk()?;
+    
+    #[cfg(feature = "dump")] {
+        // dump::names()?;
+        // dump::objects()?;
+        dump::sdk()?;
+    }
 
-    {
+    #[cfg(feature = "hook")] {
         let _hook = hook::Hook::new()?;
         idle();
     }
-
+    
     Ok(())
 }
 
@@ -172,8 +185,6 @@ unsafe extern "system" fn on_attach(dll: LPVOID) -> DWORD {
         eprintln!("Failed to initialize logger: {}", e);
     } else {
         info!("Initialized logger.");
-
-        let _time = TimeIt::new("run()");
 
         if let Err(e) = run() {
             error!("{}", e);

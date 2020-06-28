@@ -47,3 +47,9 @@ There are two functions that the generated SDK uses for querying and modifying
 bitfields: is_bit_set() and set_bit(). I placed those functions in game.rs, but
 since they're only used in the hook, it makes better sense to place them in a
 module under the hook module.
+
+Okay, now I'm going to try to selectively compile the dump and hook code based
+on their respective Cargo.toml features. I also need to add a safeguard to
+prevent both features from being enabled at the same time.
+
+Done. I'm glad I was able to conditionally compile error variants as well.
