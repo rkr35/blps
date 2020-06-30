@@ -1,0 +1,442 @@
+This evening I want to begin replacing uses of *const T with Option<&'static T>
+in the dumper. Ownership is tricky when interacting with the game because the
+dumper does not own any Object in the game. Instead, the dumper does useful work
+through reference types such as *const T and &T.
+
+Rust has something called the Nullable Pointer Optimization (NPO) where certain
+enum types can be used in the place of pointers.
+
+https://doc.rust-lang.org/nomicon/ffi.html#the-nullable-pointer-optimization
+
+Specifically, a `*const T` has the same representation and ABI as a 
+`Option<&'a T>`.
+
+If the pointer is null, then the corresponding Option resolves to the None
+variant. Otherwise, the Some variant contains a reference to the data that the
+pointer is pointing to.
+
+What I don't understand about this conversion is the lifetime attached to the
+reference. Taking a step back, what is a lifetime anyway? 
+
+--- A brief interlude into Rust lifetimes
+
+"What is a lifetime anyway?"
+
+It's a piece of static annotation that gives the Rust compiler information about
+the extent to which data is valid. Consider the following method:
+
+fn returns_local_variable() -> &str {
+    let local_variable = String::from("local variable");
+    let reference_to_local_variable = &heap;
+    
+    reference_to_local_variable
+}
+
+The equivalent function will compile (albeit with possible warnings) in C and
+C++. The function will not, however, compile in Rust. Here's the compiler error:
+
+error[E0106]: missing lifetime specifier
+ --> src\main.rs:1:32
+  |
+1 | fn returns_local_variable() -> &str {
+  |                                ^ help: consider giving it a 'static lifetime: `&'static`
+  |
+  = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+
+Every reference in Rust has a lifetime attached to it. Most of the time, Rust
+can infer these attached lifetimes, and we don't have to specify them.
+
+Rust can't infer the lifetime for our above function, though, and for good
+reason. Since the function takes no arguments, the only way to return a
+reference is through one of two means:
+    1. Return a reference to a string slice that is always valid, e.g., the
+        string is placed into the binary.
+    
+    2. Return a reference to a local variable in the function.
+
+We're looking at situation (2). The problem with returning a reference to a
+function's local variable is that the stack memory that the variable lives at is
+"allocated" in the function's prologue and gets cleaned up or "deallocated" just
+before the function returns. The very next function call could allocate stack
+memory that includes the address the reference is pointing at, and this new
+function is at liberty to overwrite the contents of this address for its own
+local variables.
+
+fn returns_local_variable() -> &str {
+    // Function allocates stack memory.
+
+    let local_variable = String::from("local variable");
+    let reference_to_local_variable = &heap;
+    
+    reference_to_local_variable
+
+    // Function cleans up stack memory. It is no longer safe to assume the above
+    // data is valid.
+}
+
+We said that a lifetime is static annotation that conveys information about the
+validity of data. The `local_variable` in the above function lives in the stack
+memory of the function. Once the function returns, that stack memory is no
+longer valid memory for the function. Therefore, `local_variable` can only exist
+for the duration of the function. Therefore, there's no possible lifetime 'a
+that we can annotate for the return type of `returns_local_variable` since there
+is no possible way `local_variable` can exist beyond the function.
+
+Incidentally, the following will compile:
+
+fn returns_reference() -> &'static str {
+    let s: &str = "embedded";
+    s
+}
+
+This function is actually case (1) from above. The variable `s` is not a 
+reference to data owned by the function, but instead, is a reference to a string
+that is always valid at its memory address. In this case, the string "embedded"
+is aptly embedded into a section of the binary. In a sense, the binary owns
+the string, and this ownership is final in that the string cannot change or
+"move" to a different owner. Therefore, the string is always valid, and
+references to it can never dangle.
+
+So these examples and explanations are a long-winded way to say:
+    1. In Rust, the validity of data at its current location is represented in
+        the typesystem by a lifetime.
+    
+    2. Rust prevents references that point to invalid data by statically
+        reasoning about the lifetimes involved.
+    
+--- end
+
+If I replace *const T with Option<&'a T>, then what is the lifetime paramter 'a
+representing here? Well that depends on the context in which this parameter
+shows up.
+
+Before we look into the trickiness of defining an extern function with lifetimes
+that is called by code that doesn't exist in the binary, let us take a look at a
+simpler example.
+
+Consider the following function:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest(first: &str, second: &str) -> &str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+That function doesn't compile. Here's the error message:
+
+error[E0106]: missing lifetime specifier
+ --> src\main.rs:2:43
+  |
+2 | fn shortest(first: &str, second: &str) -> &str {
+  |                    ----          ----     ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `first` or `second`
+
+The compiler doesn't know which lifetime to apply to the returned string. See,
+the data inside of `first` may be valid longer than the data inside of `second`.
+In other words, the lifetime of `first` is larger, or is a "subtype" of,
+`second`.
+
+So one possible lifetime to return from `shortest` is the larger lifetime of
+`first`:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'first>(first: &'first str, second: &str) -> &'first str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+That function also doesn't compile, though. Here's the error message:
+
+error[E0621]: explicit lifetime required in the type of `second`
+ --> src\main.rs:6:9
+  |
+2 | fn shortest<'first>(first: &'first str, second: &str) -> &'first str {
+  |                                                 ---- help: add explicit lifetime `'first` to the type of `second`: `&'first str` 
+...
+6 |         second
+  |         ^^^^^^ lifetime `'first` required
+
+Let's think about what happened here. We told Rust that the string we return
+from this function will live at least as long as `first`. But what if `second`
+ends up being the shorter string? The function will return `second`.
+
+But the data in `second` is valid for less time than the data in `first`.
+
+We can't magically extend the lifetime of `second` to be as long as `first`,
+so the Rust compiler gives us an error and a suggestion instead. The error says
+that &'first str and &'second str are two different types. The suggestion says
+to change the type of `second` to also be &'first str so that we return a value
+that's typed to what we declared the return type of `shortest` to be.
+
+Actually, there's a bit of a lie in the above description. We're papering over
+the assertion that the data inside of `first` lives longer than the data in
+`second`. But where is that assertion in the above function? We simply declared
+a named lifetime parameter and attached it to one of the variables, but that
+declaration and attachment doesn't convey to the Rust compiler that `first` has
+a longer validity period than `second`. In fact, the only thing that the
+lifetime parameter does here is make explicit one of two elided lifetimes in the
+function signature.
+
+Let's look at the undecorated `shortest` again:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest(first: &str, second: &str) -> &str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+We don't see the lifetimes attached to references in this function due to
+lifetime elision. We can explicitly decorate those lifetimes as such:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'first, 'second>(first: &'first str, second: &'second str) -> &'? str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+Notice, we didn't assign a lifetime to the return reference. The way the
+function is declared right now, we're telling the Rust compiler that the data
+in `first` and the data in `second` are valid for different lengths of time.
+
+Ideally, we'd assign to the return reference the lifetime of `first` if `first`
+is a shorter string than `second`. Otherwise, we'd assign the lifetime of
+`second`.
+
+Lifetime annotations, however, must be placed at the point of compilation, and
+not during the program's execution. In other words, there's no direct way to
+write something like:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'first, 'second>(first: &'first str, second: &'second str) -> &('first | 'second) str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+What we can do instead, however, is annotate all the input and output references
+with a single lifetime. This single lifetime conveys that the data in the output
+reference lives as long as the data of the input references.
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'a>(first: &'a str, second: &'a str) -> &'a str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+That function will compile.
+
+Note that 'a is not an actual lifetime. To understand why, let's look at this
+function:
+
+fn print<T: Debug>(input: T) {
+    println!("{:?}", input);
+}
+
+The `T` is not an actual type; it's a generic type that we can provide a
+concrete type for. In fact, we don't actually have to explicitly specify the
+type in this case. We just pass in a literal or variable, and the compiler will
+infer T.
+
+fn main() {
+    print(10);   
+    print(-3.14159265);
+    print("test");
+    print(true);
+}
+
+Going back to this function:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'a>(first: &'a str, second: &'a str) -> &'a str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+When we pass in input parameters, the Rust compiler will infer what lifetime
+'a actually resolves to.
+
+Look at this example:
+
+fn main() {
+    const X: &'static str = "abc";
+    const Y: &'static str = "wxyz";
+    
+    let shorter: &'static str = shortest(X, Y);
+
+    println!("shorter = {}", shorter);
+}
+
+The call to `shortest` here resolves to:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'static>(first: &'static str, second: &'static str) -> &'static str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+That is, 'a == `static.
+
+Look at this example:
+
+fn main() {
+    const X: &'static str = "abc";
+
+    {
+        let y: String = String::from("wxyz");
+        
+        let ref_y: &str = &y;
+
+        let shorter = shortest(X, ref_y);
+        println!("shorter = {}", shorter);
+    }
+
+    println!("end of program"); 
+}
+
+Rust elided a lifetime for `&y`, so we'll annotate that lifetime in a comment:
+
+fn main() {
+    const X: &'static str = "abc";
+
+    {
+        let y: String = String::from("wxyz"); // Begin '1.
+        
+        let ref_y: &/* some lifetime <= '1 */ str = &y; // The data this reference is pointing to is valid for at most '1.
+
+        let shorter = shortest(X, ref_y);
+        println!("shorter = {}", shorter);
+    } // `y` drops per RAII; End '1.
+
+    println!("end of program"); 
+}
+
+But now we have two references `X` and `y` that have lifetimes at most as big
+as `static and `1 respectively. So in the call to `shortest`, what do we fill in
+for 'a?
+
+Here's the resolution:
+
+/// Returns the shorter string (by count of bytes) of the given two strings.
+fn shortest<'1>(first: &'1 str, second: &'1 str) -> &'1 str {
+    if first.len() < second.len() {
+        first
+    } else {
+        second
+    }
+}
+
+That is, 'a == '1.
+
+To see why, understand that we only have two reasonable options for 'a:
+'static or '1. So why didn't Rust infer 'static like it did for the previous
+example? Look at the callsite of `shortest` again:
+
+fn main() {
+    const X: &'static str = "abc";
+
+    {
+        let y: String = String::from("wxyz"); // Begin '1.
+        
+        let ref_y: &/* some lifetime <= '1 */ str = &y; // The data this reference is pointing to is valid for at most '1.
+
+        let shorter = shortest(X, ref_y);
+        println!("shorter = {}", shorter);
+    } // `y` drops per RAII; End '1.
+
+    println!("end of program"); 
+}
+
+Since `y` only lives as long as that inner scope, the reference `y_ref` can only
+be valid for at most that length, `1. Therefore, `1 < `static.
+
+Back to the call to `shortest`, that means `ref_y` cannot have a type
+`&'static str` since is `&'1 str` is not a subtype of the former.
+
+There is an important implication to the resolution of 'a == '1 for
+`shortest()`.
+
+The return reference, despite possibly being derived from a reference that has
+a static lifetime, cannot exist outside of `1. That is, the following will
+fail to compile:
+
+fn main() {
+    const ALWAYS_SHORTER: &'static str = "";
+
+    let shorter = {
+        let y: String = String::from("wxyz"); // Begin '1.
+        
+        let ref_y: &/* some lifetime <= '1 */ str = &y; // The data this reference is pointing to is valid for at most '1.
+
+        shortest(ALWAYS_SHORTER, ref_y)
+    }; // `y` drops per RAII; End '1.
+    
+    println!("shorter = {}", shorter);
+    println!("end of program"); 
+}
+
+Here's the compiler error:
+
+error[E0597]: `y` does not live long enough
+  --> src\main.rs:30:53
+   |
+27 |     let shorter = {
+   |         ------- borrow later stored here
+...
+30 |         let ref_y: &/* some lifetime <= '1 */ str = &y; // The data this reference is pointing to is valid for at most '1.      
+   |                                                     ^^ borrowed value does not live long enough
+...
+33 |     }; // `y` drops per RAII; End '1.
+   |     - `y` dropped here while still borrowed
+
+The variable `shorter` is typed `&'1 str`. But the inner scope bounds '1.
+Therefore, all references we annotate with '1 will be dangling references
+outside of '1.
+
+Also, the above example is protection and not necessarily limitation.
+We can imagine the following scenario as well:
+
+fn main() {
+    const MAYBE_SHORTER: &'static str = "abc";
+
+    let shorter = {
+        let y: String = get_string_of_random_length(); // Begin '1.
+        
+        let ref_y: &/* some lifetime <= '1 */ str = &y; // The data this reference is pointing to is valid for at most '1.
+
+        shortest(MAYBE_SHORTER, ref_y)
+    }; // `y` drops per RAII; End '1.
+    
+    println!("shorter = {}", shorter);
+    println!("end of program"); 
+}
+
+In this example,  `y` may or may not be shorter than `MAYBE_SHORTER`. We cannot
+tell until runtime, when we call `get_string_of_random_length()` and check
+if we get a string less than 3 bytes. It doesn't make sense for `shorter` to
+always be `&'static str` since that String in the inner scope may be actually
+be shorter than the input MAYBE_SHORTER, in which case, the returned lifetime
+can only be as large as '1.
