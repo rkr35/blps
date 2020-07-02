@@ -226,19 +226,12 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
     let variants = variants?;
 
     let common_prefix_len = if let Some(common_prefix) = common_prefix {
-        if variants.len() <= 1 {
-            // If there are fewer than two variants in the enum, there isn't a
-            // "common" prefix to strip.
-            0
-        } else {
-            // Get the total number of bytes that we need to skip the common
-            // prefix for each variant name.
-            let num_underscores = common_prefix.len();
+        // Get the total number of bytes that we need to skip the common
+        // prefix for each variant name.
+        let num_underscores = common_prefix.len();
+        let len: usize = common_prefix.iter().map(|component| component.len()).sum();
 
-            let len: usize = common_prefix.iter().map(|component| component.len()).sum();
-
-            num_underscores + len
-        }
+        num_underscores + len
     } else {
         // If we haven't initialized the common prefix, then there are no
         // variants in the enum. We don't generate empty enums.
@@ -258,7 +251,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
             .filter(|stripped| {
                 let begins_with_number = stripped.as_bytes()[0].is_ascii_digit();
                 let is_self = *stripped == "Self";
-                
+
                 !begins_with_number && !is_self
             })
             .unwrap_or(&variant);
