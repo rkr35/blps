@@ -16,6 +16,7 @@ panic = "abort"
 
 [features]
 default = ["hook"]
+#default = ["dump"]
 dump = ["codegen", "heck"]
 hook = ["detours-sys"]
 

@@ -2,6 +2,7 @@ use crate::game::{cast, BoolProperty, Class, Const, Enum, Object, Property, Stru
 use crate::TimeIt;
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -12,6 +13,7 @@ use std::iter;
 use std::ptr;
 
 use codegen::{Field, Scope, Struct as StructGen, Type};
+use heck::CamelCase;
 use log::info;
 use thiserror::Error;
 
@@ -187,28 +189,74 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
         }
     }
 
-    let name = helper::resolve_duplicate(object)?;
-
-    if name.starts_with("Default__") {
-        return Ok(());
-    }
-
-    let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
-
     let object: *const Enum = object.cast();
 
     let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut common_prefix: Option<Vec<&str>> = None;
 
-    for variant in (*object).variants() {
-        let variant = variant.ok_or(Error::BadVariant(object))?;
+    let variants: Result<Vec<Cow<str>>, Error> = (*object)
+        .variants()
+        .map(|variant| {
+            let variant = variant.ok_or(Error::BadVariant(object))?;
 
-        let count = counts.entry(variant).and_modify(|c| *c += 1).or_default();
+            if let Some(common_prefix) = common_prefix.as_mut() {
+                // Shrink the common prefix to the number of components still matching.
+                let num_components_matching = common_prefix
+                    .iter()
+                    .zip(variant.split('_'))
+                    .take_while(|(cp, s)| *cp == s)
+                    .count();
 
-        if *count == 0 {
-            enum_gen.new_variant(variant);
-        } else {
-            enum_gen.new_variant(&format!("{}_{}", variant, *count));
-        }
+                common_prefix.truncate(num_components_matching);
+            } else {
+                // All of the first variant will be the common prefix.
+                common_prefix = Some(variant.split('_').collect());
+            }
+
+            let count = counts.entry(variant).and_modify(|c| *c += 1).or_default();
+
+            if *count == 0 {
+                Ok(variant.into())
+            } else {
+                Ok(format!("{}_{}", variant, *count).into())
+            }
+        })
+        .collect();
+
+    let variants = variants?;
+
+    let common_prefix_len = if let Some(common_prefix) = common_prefix {
+        // Get the total number of bytes that we need to skip the common
+        // prefix for each variant name.
+        let num_underscores = common_prefix.len();
+        let len: usize = common_prefix.iter().map(|component| component.len()).sum();
+
+        num_underscores + len
+    } else {
+        // If we haven't initialized the common prefix, then there are no
+        // variants in the enum. We don't generate empty enums.
+        return Ok(());
+    };
+
+    let enum_gen = sdk
+        .new_enum(&helper::resolve_duplicate(object.cast())?)
+        .repr("u8")
+        .vis("pub");
+
+    for variant in variants {
+        // Use the unstripped prefix form of the variant if the stripped form
+        // is an invalid Rust identifier.
+        let variant = variant
+            .get(common_prefix_len..)
+            .filter(|stripped| {
+                let begins_with_number = stripped.as_bytes()[0].is_ascii_digit();
+                let is_self = *stripped == "Self";
+
+                !begins_with_number && !is_self
+            })
+            .unwrap_or(&variant);
+        
+        enum_gen.new_variant(&variant.to_camel_case());
     }
 
     Ok(())
