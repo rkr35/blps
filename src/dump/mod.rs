@@ -226,17 +226,14 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
     let variants = variants?;
 
     let common_prefix_len = if let Some(common_prefix) = common_prefix {
-        if variants.len() <= 1 || common_prefix.is_empty() {
+        if variants.len() <= 1 {
             // If there are fewer than two variants in the enum, there isn't a
             // "common" prefix to strip.
-
-            // Likewise, if a common prefix doesn't exist among all the
-            // variants, then there's nothing to strip.
             0
         } else {
             // Get the total number of bytes that we need to skip the common
             // prefix for each variant name.
-            let num_underscores = common_prefix.len() - 1;
+            let num_underscores = common_prefix.len();
 
             let len: usize = common_prefix.iter().map(|component| component.len()).sum();
 
@@ -254,7 +251,18 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
         .vis("pub");
 
     for variant in variants {
-        let variant = &variant[common_prefix_len..];
+        // Use the unstripped prefix form of the variant if the stripped form
+        // is an invalid Rust identifier.
+        let variant = variant
+            .get(common_prefix_len..)
+            .filter(|stripped| {
+                let begins_with_number = stripped.as_bytes()[0].is_ascii_digit();
+                let is_self = *stripped == "Self";
+                
+                !begins_with_number && !is_self
+            })
+            .unwrap_or(&variant);
+        
         enum_gen.new_variant(&variant.to_camel_case());
     }
 
