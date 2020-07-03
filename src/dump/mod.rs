@@ -36,6 +36,9 @@ pub enum Error {
     #[error("enum {0:?} has an unknown or ill-formed variant")]
     BadVariant(*const Enum),
 
+    #[error("unable to get the outer class for constant {0:?}")]
+    ConstOuter(*const Object),
+
     #[error("helper error: {0}")]
     Helper(#[from] helper::Error),
 
@@ -179,7 +182,15 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
         value
     };
 
-    sdk.raw(&format!("// {} = {}", helper::get_name(object)?, value));
+    let outer = (*object)
+        .iter_outer()
+        .skip(1)
+        .next()
+        .ok_or(Error::ConstOuter(object))?;
+
+    let outer = helper::get_name(outer)?;
+
+    sdk.raw(&format!("// {}_{} = {}", outer, helper::get_name(object)?, value));
     Ok(())
 }
 
