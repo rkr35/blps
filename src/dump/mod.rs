@@ -190,7 +190,12 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 
     let outer = helper::get_name(outer)?;
 
-    sdk.raw(&format!("// {}_{} = {}", outer, helper::get_name(object)?, value));
+    sdk.raw(&format!(
+        "// {}_{} = {}",
+        outer,
+        helper::get_name(object)?,
+        value
+    ));
     Ok(())
 }
 
@@ -252,10 +257,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let name = helper::resolve_duplicate(object.cast())?;
 
-    let enum_gen = sdk
-        .new_enum(&name)
-        .repr("u8")
-        .vis("pub");
+    let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
 
     for variant in variants {
         // Use the unstripped prefix form of the variant if the stripped form
@@ -277,7 +279,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
                 }
             })
             .to_camel_case();
-        
+
         enum_gen.new_variant(&variant);
     }
 
