@@ -239,8 +239,10 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
         return Ok(());
     };
 
+    let name = helper::resolve_duplicate(object.cast())?;
+
     let enum_gen = sdk
-        .new_enum(&helper::resolve_duplicate(object.cast())?)
+        .new_enum(&name)
         .repr("u8")
         .vis("pub");
 
@@ -255,9 +257,17 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
                 !begins_with_number && !is_self
             })
-            .unwrap_or(&variant);
+            .map_or(variant.as_ref(), |stripped| {
+                // Special case: Trim "Enum name + Max" to "Max".
+                if stripped.starts_with(name.as_ref()) && stripped.ends_with("MAX") {
+                    &stripped[name.len()..]
+                } else {
+                    stripped
+                }
+            })
+            .to_camel_case();
         
-        enum_gen.new_variant(&variant.to_camel_case());
+        enum_gen.new_variant(&variant);
     }
 
     Ok(())
