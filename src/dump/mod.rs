@@ -131,7 +131,8 @@ unsafe fn find_static_classes() -> Result<(), Error> {
 
 fn add_crate_attributes(scope: &mut Scope) {
     scope.raw(
-        "#![allow(dead_code)]\n\
+        "#![allow(clippy::doc_markdown)]\n\
+         #![allow(dead_code)]\n\
          #![allow(non_camel_case_types)]\n\
          #![allow(non_snake_case)]",
     );
