@@ -8,12 +8,14 @@ use detours_sys::{
     DetourAttach, DetourDetach, DetourTransactionBegin, DetourTransactionCommit,
     DetourUpdateThread, LONG as DetourErrorCode,
 };
-use log::{error, info, warn};
+use log::error;
 use thiserror::Error;
 use winapi::um::processthreadsapi::GetCurrentThread;
 
 mod bitfield;
 mod sdk;
+
+mod user;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -87,21 +89,7 @@ unsafe extern "fastcall" fn my_process_event(
         return_value: *mut c_void,
     );
 
-    if let Some(full_name) = function.full_name() {
-        use std::collections::HashSet;
-        static mut UNIQUE_EVENTS: Option<HashSet<String>> = None;
-
-        if let Some(set) = UNIQUE_EVENTS.as_mut() {
-            if set.insert(full_name.clone()) {
-                info!("{}", full_name);
-            }
-        } else {
-            UNIQUE_EVENTS = Some(HashSet::new());
-        }
-    } else {
-        warn!("couldn't get full name");
-    }
-
     let original = mem::transmute::<*mut c_void, ProcessEvent>(PROCESS_EVENT);
+    user::process_event(this, function, parameters, return_value);
     original(this, edx, function, parameters, return_value);
 }
