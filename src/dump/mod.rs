@@ -184,8 +184,7 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
 
     let outer = (*object)
         .iter_outer()
-        .skip(1)
-        .next()
+        .nth(1)
         .ok_or(Error::ConstOuter(object))?;
 
     let outer = helper::get_name(outer)?;
