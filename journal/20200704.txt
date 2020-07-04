@@ -40,3 +40,48 @@ Address   To        From      Size      Comment                                 
 026FFDB0  77B07084  76E7F989  5C        kernel32.76E7F989                                  System
 026FFE0C  77B07054  77B07084  10        ntdll.77B07084                                     System
 026FFE1C  00000000  77B07054            ntdll.77B07054                                     User
+
+005C70F4 | 57                       | push edi                                                            |
+005C70F5 | E8 A6E01000              | call <borderlandspresequel.sub_6D51A0>                              | CallFunction
+005C70FA | 8B4D F4                  | mov ecx,dword ptr ss:[ebp-C]                                        |
+005C70FD | 64:890D 00000000         | mov dword ptr fs:[0],ecx                                            |
+005C7104 | 59                       | pop ecx                                                             |
+005C7105 | 5F                       | pop edi                                                             |
+005C7106 | 5E                       | pop esi                                                             |
+005C7107 | 5B                       | pop ebx                                                             |
+005C7108 | 8BE5                     | mov esp,ebp                                                         |
+005C710A | 5D                       | pop ebp                                                             |
+005C710B | C2 0800                  | ret 8                                                               |
+005C710E | 837A 78 00               | cmp dword ptr ds:[edx+78],0                                         |
+005C7112 | 75 32                    | jne borderlandspresequel.5C7146                                     |
+005C7114 | 8B4D E4                  | mov ecx,dword ptr ss:[ebp-1C]                                       |
+005C7117 | 8B55 E0                  | mov edx,dword ptr ss:[ebp-20]                                       |
+005C711A | 6A 00                    | push 0                                                              |
+005C711C | 51                       | push ecx                                                            |
+005C711D | 52                       | push edx                                                            |
+005C711E | 8BCB                     | mov ecx,ebx                                                         |
+005C7120 | E8 FB970400              | call <borderlandspresequel.sub_610920>                              |
+005C7125 | 50                       | push eax                                                            |
+005C7126 | 8B45 0C                  | mov eax,dword ptr ss:[ebp+C]                                        |
+005C7129 | 50                       | push eax                                                            |
+005C712A | 8BCB                     | mov ecx,ebx                                                         |
+005C712C | 57                       | push edi                                                            |
+005C712D | E8 6EE01000              | call <borderlandspresequel.sub_6D51A0>                              | CallFunction
+005C7132 | 8B4D F4                  | mov ecx,dword ptr ss:[ebp-C]                                        |
+005C7135 | 64:890D 00000000         | mov dword ptr fs:[0],ecx                                            |
+005C713C | 59                       | pop ecx                                                             |
+005C713D | 5F                       | pop edi                                                             |
+005C713E | 5E                       | pop esi                                                             |
+005C713F | 5B                       | pop ebx                                                             |
+005C7140 | 8BE5                     | mov esp,ebp                                                         |
+005C7142 | 5D                       | pop ebp                                                             |
+005C7143 | C2 0800                  | ret 8                                                               |
+005C7146 | 8D4D DC                  | lea ecx,dword ptr ss:[ebp-24]                                       |
+005C7149 | 51                       | push ecx                                                            |
+005C714A | 8BCA                     | mov ecx,edx                                                         |
+005C714C | E8 1F62FCFF              | call <borderlandspresequel.sub_58D370>                              |
+005C7151 | 8BC8                     | mov ecx,eax                                                         |
+005C7153 | C745 FC 04000000         | mov dword ptr ss:[ebp-4],4                                          |
+005C715A | E8 51E0F9FF              | call <borderlandspresequel.sub_5651B0>                              |
+005C715F | 50                       | push eax                                                            |
+005C7160 | 68 F0FB6901              | push borderlandspresequel.169FBF0                                   | 169FBF0:L"Attempt to call None through delegate property '%s'"
