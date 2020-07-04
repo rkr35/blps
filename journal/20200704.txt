@@ -1,0 +1,42 @@
+https://github.com/rkr35/Borderlands2SDK/blob/nogwen/src/BL2SDK/BL2SDK.cpp
+(Forked from https://github.com/McSimp/Borderlands2SDK)
+
+https://www.unknowncheats.me/forum/unreal-3-engine/89430-there-any-method-can-hook-functions-playercontroller-other-class.html
+
+HyPeR-X
+    "Yes ofcourse this is possible. Events are handeled via ProcessEvent, functions via CallFunction/ProcessInternal. Either hook those or do it the clean way and hook via UFunction->Func pointer "
+
+6cd9f0 is ProcessEvent
+6d51a0 is maybe CallFunction
+    55 8B EC 6A FF 68 ? ? ? ? 64 A1 ? ? ? ? 50 81 EC ? ? ? ? A1 ? ? ? ? 33 C5 89 45 F0 53 56 57 50 8D 45 F4 64 A3 ? ? ? ? 8B 7D 10 8B 45 0C 
+
+Address   To        From      Size      Comment                                            Party                                                                                                                                                                                    
+026FF454  005AF360  006D51A0  1C        borderlandspresequel.sub_6D51A0                    User
+026FF470  006CD68A  005AF360  10        borderlandspresequel.sub_5AF330+30                 User
+026FF480  006CD759  006CD68A  3C        borderlandspresequel.006CD68A                      User
+026FF4BC  006CD68A  006CD759  10        borderlandspresequel.006CD759                      User
+026FF4CC  006CD99F  006CD68A  78        borderlandspresequel.006CD68A                      User
+026FF544  006CDC65  006CD99F  A8        borderlandspresequel.sub_6CD880+11F                User
+026FF5EC  006D4BB3  006CDC65  18        borderlandspresequel.sub_6CD9F0+275                User
+
+026FF604  00929291  006D4BB3  A0        borderlandspresequel.sub_6D4B70+43                 User
+026FF6A4  009074C7  00929291  20        borderlandspresequel.sub_928C00+691                User
+026FF6C4  00930921  009074C7  44        borderlandspresequel.sub_907410+B7                 User
+026FF708  009325CB  00930921  168       borderlandspresequel.sub_930810+111                User
+026FF870  0092CDFE  009325CB  44        borderlandspresequel.sub_932160+46B                User
+026FF8B4  0092F7B3  0092CDFE  50        borderlandspresequel.sub_92CAF0+30E                User
+026FF904  00A8945E  0092F7B3  190       borderlandspresequel.sub_92F620+193                User
+026FFA94  00A8A008  00A8945E  1C        borderlandspresequel.sub_A89180+2DE                User
+026FFAB0  00A8A0A4  00A8A008  18        borderlandspresequel.sub_A89F60+A8                 User
+026FFAC8  006DA704  00A8A0A4  94        borderlandspresequel.sub_A89F60+144                User
+026FFB5C  008F338A  006DA704  6C        borderlandspresequel.006DA704                      User
+026FFBC8  010975BD  008F338A  38        borderlandspresequel.008F338A                      User
+026FFC00  00F68109  010975BD  48        borderlandspresequel.sub_1097580+3D                User
+026FFC48  00F6D5EA  00F68109  3C        borderlandspresequel.00F68109                      User
+026FFC84  00F6D6EF  00F6D5EA  44        borderlandspresequel.00F6D5EA                      User
+026FFCC8  00F6D7AC  00F6D6EF  44        borderlandspresequel.sub_F6D630+BF                 User
+026FFD0C  014F4F57  00F6D7AC  94        borderlandspresequel.sub_F6D710+9C                 User
+026FFDA0  76E7F989  014F4F57  10        borderlandspresequel.014F4F57                      System
+026FFDB0  77B07084  76E7F989  5C        kernel32.76E7F989                                  System
+026FFE0C  77B07054  77B07084  10        ntdll.77B07084                                     System
+026FFE1C  00000000  77B07054            ntdll.77B07054                                     User
