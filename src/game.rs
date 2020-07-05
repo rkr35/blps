@@ -17,9 +17,12 @@ pub unsafe fn cast<To>(from: &Object) -> &To {
 
 impl Objects {
     pub unsafe fn find(&self, full_name: &str) -> Option<*const Object> {
+        self.find_mut(full_name).map(|o| o as *const Object)
+    }
+
+    pub unsafe fn find_mut(&self, full_name: &str) -> Option<*mut Object> {
         self.iter()
             .find(|&o| (*o).full_name().map_or(false, |n| n == full_name))
-            .map(|o| o as *const Object)
     }
 }
 
