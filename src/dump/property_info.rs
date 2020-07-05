@@ -137,7 +137,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let name = helper::get_name(property.meta_class.cast())?;
-                let typ = format!("Option<&'static mut {}>", name);
+                let typ = format!("*mut {}", name);
 
                 Self::new(size_of::<usize>(), typ.into())
             } else if property.is(DELEGATE_PROPERTY) {
@@ -172,7 +172,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let name = helper::get_name(property.class.cast())?;
-                let typ = format!("Option<&'static mut {}>", name);
+                let typ = format!("*mut {}", name);
 
                 Self::new(size_of::<usize>(), typ.into())
             } else if property.is(STR_PROPERTY) {
