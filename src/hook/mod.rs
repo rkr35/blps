@@ -12,13 +12,21 @@ use log::error;
 use thiserror::Error;
 use winapi::um::processthreadsapi::GetCurrentThread;
 
+mod cached_function_indexes;
+use cached_function_indexes::CachedFunctionIndexes;
+
 mod bitfield;
 mod sdk;
 
 mod user;
 
+pub static mut CACHED_FUNCTION_INDEXES: Option<CachedFunctionIndexes> = None;
+
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("cached function indexes error: {0}")]
+    CFI(#[from] cached_function_indexes::Error),
+
     #[error("detour error: {0} returned {1}")]
     Detour(&'static str, DetourErrorCode),
 }
@@ -43,6 +51,7 @@ pub struct Hook;
 
 impl Hook {
     pub unsafe fn new() -> Result<Hook, Error> {
+        CACHED_FUNCTION_INDEXES = Some(CachedFunctionIndexes::new()?);
         hook_process_event()?;
         Ok(Hook)
     }
