@@ -1,0 +1,90 @@
+67FE1EC0 | 55                       | push ebp                                                            | mod.rs:86
+67FE1EC1 | 53                       | push ebx                                                            |
+67FE1EC2 | 57                       | push edi                                                            |
+67FE1EC3 | 56                       | push esi                                                            |
+67FE1EC4 | 83EC 70                  | sub esp,70                                                          |
+67FE1EC7 | 8BB424 84000000          | mov esi,dword ptr ss:[esp+84]                                       |
+67FE1ECE | 8B9C24 8C000000          | mov ebx,dword ptr ss:[esp+8C]                                       |
+67FE1ED5 | 8BAC24 88000000          | mov ebp,dword ptr ss:[esp+88]                                       |
+67FE1EDC | 8B3D 10310168            | mov edi,dword ptr ds:[<PROCESS_EVENT>]                              | mod.rs:101
+67FE1EE2 | 8B46 20                  | mov eax,dword ptr ds:[esi+20]                                       | mod.rs:102
+67FE1EE5 | 3B05 04310168            | cmp eax,dword ptr ds:[68013104]                                     |
+67FE1EEB | 0F85 37010000            | jne blps.67FE2028                                                   |
+67FE1EF1 | 890C24                   | mov dword ptr ss:[esp],ecx                                          |
+67FE1EF4 | 895424 04                | mov dword ptr ss:[esp+4],edx                                        |
+67FE1EF8 | 8D4C24 20                | lea ecx,dword ptr ss:[esp+20]                                       |
+67FE1EFC | 89F2                     | mov edx,esi                                                         |
+67FE1EFE | 897C24 08                | mov dword ptr ss:[esp+8],edi                                        |
+67FE1F02 | E8 09F9FFFF              | call <blps.blps::game::Object::full_name>                           |
+67FE1F07 | 837C24 20 00             | cmp dword ptr ss:[esp+20],0                                         |
+67FE1F0C | 0F84 FD000000            | je blps.67FE200F                                                    |
+67FE1F12 | 8B4424 28                | mov eax,dword ptr ss:[esp+28]                                       |
+67FE1F16 | F2:0F104424 20           | movsd xmm0,qword ptr ss:[esp+20]                                    |
+67FE1F1C | 894424 14                | mov dword ptr ss:[esp+14],eax                                       |
+67FE1F20 | F2:0F114424 0C           | movsd qword ptr ss:[esp+C],xmm0                                     |
+67FE1F26 | A1 50310168              | mov eax,dword ptr ds:[<MAX_LOG_LEVEL_FILTER>]                       |
+67FE1F2B | 83F8 03                  | cmp eax,3                                                           |
+67FE1F2E | 0F82 B7000000            | jb blps.67FE1FEB                                                    |
+67FE1F34 | 8D4424 0C                | lea eax,dword ptr ss:[esp+C]                                        |
+67FE1F38 | 0F280D B0C10068          | movaps xmm1,xmmword ptr ds:[<__xmm@00000000000000000000000100000000 |
+67FE1F3F | 0F281D C0C10068          | movaps xmm3,xmmword ptr ds:[<__xmm@00000010000000000000000000000001 |
+67FE1F46 | BE DC030168              | mov esi,<blps.&FMT_NONE>                                            |
+67FE1F4B | BA 65C40068              | mov edx,blps.6800C465                                               |
+67FE1F50 | 0F2815 D0C10068          | movaps xmm2,xmmword ptr ds:[<__xmm@00000001000000140000000000000000 |
+67FE1F57 | B9 A4EF0068              | mov ecx,<blps.NOP>                                                  |
+67FE1F5C | 894424 18                | mov dword ptr ss:[esp+18],eax                                       |
+67FE1F60 | C74424 1C F016FE67       | mov dword ptr ss:[esp+1C],<blps.alloc::string::{{impl}}::fmt>       |
+67FE1F68 | 66:0F6EC6                | movd xmm0,esi                                                       |
+67FE1F6C | 8D7424 18                | lea esi,dword ptr ss:[esp+18]                                       |
+67FE1F70 | A1 54310168              | mov eax,dword ptr ds:[<STATE>]                                      |
+67FE1F75 | C74424 2C 03000000       | mov dword ptr ss:[esp+2C],3                                         |
+67FE1F7D | C74424 30 65C40068       | mov dword ptr ss:[esp+30],blps.6800C465                             |
+67FE1F85 | C74424 34 10000000       | mov dword ptr ss:[esp+34],10                                        |
+67FE1F8D | F3:0F10C8                | movss xmm1,xmm0                                                     |
+67FE1F91 | 66:0F6EC2                | movd xmm0,edx                                                       |
+67FE1F95 | BA 75C40068              | mov edx,blps.6800C475                                               |
+67FE1F9A | 0FC6C3 30                | shufps xmm0,xmm3,30                                                 |
+67FE1F9E | 0F114C24 38              | movups xmmword ptr ss:[esp+38],xmm1                                 |
+67FE1FA3 | 897424 48                | mov dword ptr ss:[esp+48],esi                                       |
+67FE1FA7 | 83F8 02                  | cmp eax,2                                                           |
+67FE1FAA | B8 08F00068              | mov eax,<blps.vtable>                                               |
+67FE1FAF | 0FC6D8 84                | shufps xmm3,xmm0,84                                                 |
+67FE1FB3 | 66:0F6EC2                | movd xmm0,edx                                                       |
+67FE1FB7 | 8D5424 2C                | lea edx,dword ptr ss:[esp+2C]                                       |
+67FE1FBB | 0F4405 04300168          | cmove eax,dword ptr ds:[<&vtable>]                                  |
+67FE1FC2 | 0F440D 00300168          | cmove ecx,dword ptr ds:[<LOGGER>]                                   |
+67FE1FC9 | 0FC6C2 00                | shufps xmm0,xmm2,0                                                  |
+67FE1FCD | 0F115C24 4C              | movups xmmword ptr ss:[esp+4C],xmm3                                 |
+67FE1FD2 | 0FC6C2 E2                | shufps xmm0,xmm2,E2                                                 |
+67FE1FD6 | 0F114424 5C              | movups xmmword ptr ss:[esp+5C],xmm0                                 |
+67FE1FDB | C74424 6C 10000000       | mov dword ptr ss:[esp+6C],10                                        |
+67FE1FE3 | 52                       | push edx                                                            |
+67FE1FE4 | 51                       | push ecx                                                            |
+67FE1FE5 | FF50 10                  | call dword ptr ds:[eax+10]                                          |
+67FE1FE8 | 83C4 08                  | add esp,8                                                           |
+67FE1FEB | 8B7424 0C                | mov esi,dword ptr ss:[esp+C]                                        |
+67FE1FEF | 85F6                     | test esi,esi                                                        |
+67FE1FF1 | 74 15                    | je blps.67FE2008                                                    |
+67FE1FF3 | 837C24 10 00             | cmp dword ptr ss:[esp+10],0                                         |
+67FE1FF8 | 74 0E                    | je blps.67FE2008                                                    |
+67FE1FFA | E8 C1860200              | call <blps._GetProcessHeap@0>                                       |
+67FE1FFF | 56                       | push esi                                                            |
+67FE2000 | 6A 00                    | push 0                                                              |
+67FE2002 | 50                       | push eax                                                            |
+67FE2003 | E8 D0860200              | call <blps._HeapFree@12>                                            |
+67FE2008 | 8BB424 84000000          | mov esi,dword ptr ss:[esp+84]                                       |
+67FE200F | 8BAC24 88000000          | mov ebp,dword ptr ss:[esp+88]                                       |
+67FE2016 | 8B7C24 08                | mov edi,dword ptr ss:[esp+8]                                        |
+67FE201A | 8B5424 04                | mov edx,dword ptr ss:[esp+4]                                        |
+67FE201E | 8B9C24 8C000000          | mov ebx,dword ptr ss:[esp+8C]                                       |
+67FE2025 | 8B0C24                   | mov ecx,dword ptr ss:[esp]                                          |
+67FE2028 | 53                       | push ebx                                                            | mod.rs:103
+67FE2029 | 55                       | push ebp                                                            |
+67FE202A | 56                       | push esi                                                            |
+67FE202B | FFD7                     | call edi                                                            |
+67FE202D | 83C4 70                  | add esp,70                                                          | mod.rs:104
+67FE2030 | 5E                       | pop esi                                                             |
+67FE2031 | 5F                       | pop edi                                                             |
+67FE2032 | 5B                       | pop ebx                                                             |
+67FE2033 | 5D                       | pop ebp                                                             |
+67FE2034 | C2 0C00                  | ret C                                                               |
