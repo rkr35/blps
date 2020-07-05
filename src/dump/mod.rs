@@ -143,7 +143,7 @@ fn add_crate_attributes(scope: &mut Scope) {
 
 fn add_imports(scope: &mut Scope) {
     scope.raw(
-        "use crate::game::{Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+        "use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
          use crate::hook::bitfield::{is_bit_set, set_bit};\n\
          use std::ops::{Deref, DerefMut};",
     );
@@ -335,6 +335,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
 
     if let Some(super_class) = super_class {
         add_deref_impls(sdk, &name, super_class);
+    } else if name == "Object" {
+        add_object_deref_impl(sdk);
     }
 
     Ok(())
@@ -480,6 +482,25 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .arg_mut_self()
         .ret("&mut Self::Target")
         .line("&mut self.base");
+}
+
+/// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) -> 
+/// `&[mut] game::Object` (handwritten with helpful impls)
+fn add_object_deref_impl(sdk: &mut Scope) {
+    sdk.new_impl("Object")
+        .impl_trait("Deref")
+        .associate_type("Target", "game::Object")
+        .new_fn("deref")
+        .arg_ref_self()
+        .ret("&Self::Target")
+        .line("unsafe { &*(self as *const Self as *const Self::Target) }");
+
+    sdk.new_impl("Object")
+        .impl_trait("DerefMut")
+        .new_fn("deref_mut")
+        .arg_mut_self()
+        .ret("&mut Self::Target")
+        .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }");
 }
 
 unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
