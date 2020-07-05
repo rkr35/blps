@@ -84,16 +84,16 @@ unsafe fn unhook_process_event() -> Result<(), Error> {
 }
 
 unsafe extern "fastcall" fn my_process_event(
-    this: &game::Object,
+    this: *mut game::Object,
     edx: usize,
-    function: &game::Function,
+    function: *mut game::Function,
     parameters: *mut c_void,
     return_value: *mut c_void,
 ) {
     type ProcessEvent = unsafe extern "fastcall" fn(
-        this: &game::Object,
-        _edx: usize,
-        function: &game::Function,
+        this: *mut game::Object,
+        edx: usize,
+        function: *mut game::Function,
         parameters: *mut c_void,
         return_value: *mut c_void,
     );
