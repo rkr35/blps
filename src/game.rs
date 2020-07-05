@@ -2,6 +2,7 @@ use crate::GLOBAL_NAMES;
 
 use std::ffi::{c_void, CStr, OsString};
 use std::iter;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
 use std::os::windows::ffi::OsStringExt;
@@ -130,6 +131,24 @@ impl Object {
 
     pub unsafe fn is(&self, class: *const Class) -> bool {
         self.iter_class().any(|c| ptr::eq(c, class))
+    }
+
+    pub unsafe fn process_event(&mut self, function: *mut Function, parameters: *mut c_void) {
+        type ProcessEvent = unsafe extern "fastcall" fn(
+            this: *mut Object,
+            edx: usize,
+            function: *mut Function,
+            parameters: *mut c_void,
+            return_value: *mut usize,
+        );
+
+        const INDEX: usize = 58;
+        let vtable = *(self as *const Self as *const *const usize);
+        let process_event = mem::transmute::<usize, ProcessEvent>(*vtable.add(INDEX));
+
+        let mut return_value = 0;
+        // log::info!("obj is {:#x} and pe is {:#x}", self as *const Self as usize, process_event as usize);
+        process_event(self, 0, function, parameters, &mut return_value);
     }
 }
 
