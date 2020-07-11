@@ -323,7 +323,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         struct_gen.doc(&doc);
     }
 
-    let properties = get_properties(structure, offset);
+    let properties = get_fields(structure, offset);
     let bitfields = add_fields(struct_gen, &mut offset, properties)?;
 
     if offset < structure_size {
@@ -341,7 +341,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     Ok(())
 }
 
-unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
+unsafe fn get_fields(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
     let mut properties: Vec<&Property> = (*structure)
         .iter_children()
         .filter(|p| p.element_size > 0)
