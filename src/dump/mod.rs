@@ -527,6 +527,7 @@ unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Erro
 
         let function_gen = impl_gen
             .new_fn(&function_name)
+            .vis("pub unsafe")
             .arg_mut_self();
 
         let flags = function.flags;
