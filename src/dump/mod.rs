@@ -349,19 +349,21 @@ unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static 
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
         .collect();
 
-    properties.sort_by(|p, q| {
-        p.offset.cmp(&q.offset).then_with(|| {
-            if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
-                let p: &BoolProperty = cast(p);
-                let q: &BoolProperty = cast(q);
-                p.bitmask.cmp(&q.bitmask)
-            } else {
-                Ordering::Equal
-            }
-        })
-    });
+    properties.sort_by(|p, q| property_compare(p, q));
 
     properties
+}
+
+unsafe fn property_compare(p: &Property, q: &Property) -> Ordering {
+    p.offset.cmp(&q.offset).then_with(|| {
+        if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
+            let p: &BoolProperty = cast(p);
+            let q: &BoolProperty = cast(q);
+            p.bitmask.cmp(&q.bitmask)
+        } else {
+            Ordering::Equal
+        }
+    })
 }
 
 unsafe fn add_fields(
