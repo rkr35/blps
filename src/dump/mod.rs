@@ -9,7 +9,6 @@ use std::convert::TryFrom;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
-use std::iter;
 use std::ptr;
 
 use codegen::{Field, Scope, Struct as StructGen, Type};
@@ -343,12 +342,8 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
 }
 
 unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
-    let properties = iter::successors(
-        (*structure).children.cast::<Property>().as_ref(),
-        |property| property.next.cast::<Property>().as_ref(),
-    );
-
-    let mut properties: Vec<&Property> = properties
+    let mut properties: Vec<&Property> = (*structure)
+        .iter_children()
         .filter(|p| p.element_size > 0)
         .filter(|p| p.offset >= offset)
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))

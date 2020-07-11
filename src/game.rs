@@ -196,6 +196,15 @@ impl DerefMut for Struct {
     }
 }
 
+impl Struct {
+    pub unsafe fn iter_children(&self) -> impl Iterator<Item = &Property> {
+        iter::successors(
+            self.children.cast::<Property>().as_ref(),
+            |property| property.next.cast::<Property>().as_ref(),
+        )
+    }
+}
+
 pub type FString = Array<u16>; // &[u16] -> OsString -> Cow<str>
 
 impl FString {
