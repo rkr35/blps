@@ -1,4 +1,4 @@
-use crate::game::{cast, BoolProperty, Class, Const, Enum, Object, Property, Struct};
+use crate::game::{cast, BoolProperty, Class, Const, Enum, Function, Object, Property, Struct};
 use crate::TimeIt;
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 
@@ -498,5 +498,64 @@ fn add_object_deref_impl(sdk: &mut Scope) {
 }
 
 unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    write_structure(sdk, object)
+    write_structure(sdk, object)?;
+
+    let name = helper::resolve_duplicate(object)?;
+
+    let impl_gen = sdk.new_impl(&name);
+
+    let class: *const Struct = object.cast();
+
+    let functions = (*class)
+        .iter_children()
+        .filter(|p| p.is(FUNCTION))
+        .map(|p| cast::<Function>(p));
+
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+
+    for function in functions {
+        let function_name = {
+            let name = helper::get_name(function as &Object)?;
+            let count = *counts.entry(name).and_modify(|c| *c += 1).or_default();
+
+            if count > 0 {
+                Cow::Owned(format!("{}_{}", name, count))
+            } else {
+                Cow::Borrowed(name)
+            }
+        };
+
+        let function_gen = impl_gen
+            .new_fn(&function_name)
+            .arg_mut_self();
+
+        let flags = function.flags;
+
+        let mut parameters: Vec<&Property> = function
+            .iter_children()
+            .filter(|p| p.element_size > 0)
+            .collect();
+
+        parameters.sort_by(|p, q| property_compare(p, q));
+
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+
+        for parameter in parameters {
+            let info = PropertyInfo::try_from(parameter)?;
+            let name = {
+                let name = helper::get_name(parameter as &Object)?;
+                let count = *counts.entry(name).and_modify(|c| *c += 1).or_default();
+
+                if count > 0 {
+                    Cow::Owned(format!("{}_{}", name, count))
+                } else {
+                    Cow::Borrowed(scrub_reserved_name(name))
+                }
+            };
+
+            function_gen.arg(&name, info.as_typed_comment().as_ref());
+        }
+    }
+
+    Ok(())
 }
