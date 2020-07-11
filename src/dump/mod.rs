@@ -413,11 +413,7 @@ unsafe fn add_fields(
             }
         };
 
-        let mut field_type = if info.comment.is_empty() {
-            info.field_type
-        } else {
-            format!("{} /* {} */", info.field_type, info.comment).into()
-        };
+        let mut field_type = info.as_typed_comment();
 
         if property.array_dim > 1 {
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
