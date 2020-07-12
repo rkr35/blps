@@ -48,7 +48,7 @@ pub enum Error {
     PropertyInfo(#[from] property_info::Error),
 
     #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
-    PropertySizeMismatch(*const Property, u32, PropertyInfo),
+    PropertySizeMismatch(*const Property, i64, PropertyInfo),
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
@@ -383,9 +383,10 @@ unsafe fn add_fields(
         let info = PropertyInfo::try_from(property)?;
 
         let total_property_size = property.element_size * property.array_dim;
-        let size_mismatch = total_property_size - info.size * property.array_dim;
+        
+        let size_mismatch = i64::from(total_property_size) - i64::from(info.size * property.array_dim);
 
-        if size_mismatch > 0 {
+        if size_mismatch != 0 {
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
         }
 
