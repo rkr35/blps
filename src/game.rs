@@ -371,6 +371,23 @@ impl DerefMut for Property {
     }
 }
 
+impl Property {
+    pub fn is_return_param(&self) -> bool {
+        const RETURN_PARAM: u32 = 0x400;
+        self.property_flags_0 & RETURN_PARAM == RETURN_PARAM
+    }
+    
+    pub fn is_out_param(&self) -> bool {
+        const OUT_PARAM: u32 = 0x100;
+        self.property_flags_0 & OUT_PARAM == OUT_PARAM
+    }
+
+    pub fn is_param(&self) -> bool {
+        const PARAM: u32 = 0x80;
+        self.property_flags_0 & PARAM == PARAM
+    }    
+}
+
 #[repr(C)]
 pub struct ByteProperty {
     pub property: Property,
