@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::ptr;
 
-use codegen::{Field, Scope, Struct as StructGen, Type};
+use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
 use heck::CamelCase;
 use log::info;
 use thiserror::Error;
@@ -491,63 +491,97 @@ fn add_object_deref_impl(sdk: &mut Scope) {
 
 unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     write_structure(sdk, object)?;
+    add_methods(sdk, object.cast())?;
+    Ok(())
+}
 
-    let name = helper::resolve_duplicate(object)?;
-
+unsafe fn add_methods(sdk: &mut Scope, class: *const Struct) -> Result<(), Error> {
+    let name = helper::resolve_duplicate(class.cast())?;
     let impl_gen = sdk.new_impl(&name);
 
-    let class: *const Struct = object.cast();
+    let mut method_name_counts: HashMap<&str, u8> = HashMap::new();
 
-    let functions = (*class)
+    for method in get_methods(class) {
+        add_method(impl_gen, &mut method_name_counts, method)?;
+    }
+
+    Ok(())
+}
+
+unsafe fn get_methods(class: *const Struct) -> impl Iterator<Item = &'static Function> {
+    (*class)
         .iter_children()
         .filter(|p| p.is(FUNCTION))
-        .map(|p| cast::<Function>(p));
+        .map(|p| cast::<Function>(p))
+}
 
-    let mut counts: HashMap<&str, usize> = HashMap::new();
+#[derive(PartialEq, Eq)]
+enum ParameterKind {
+    Input,
+    Output,
+}
 
-    for function in functions {
-        let function_name = {
-            let name = helper::get_name(function as &Object)?;
-            let count = *counts.entry(name).and_modify(|c| *c += 1).or_default();
+struct Parameter<'a> {
+    parameter: &'a Property,
+    kind: ParameterKind,
+    name: Cow<'a, str>,
+    typ: Cow<'a, str>,
+}
 
-            if count > 0 {
-                Cow::Owned(format!("{}_{}", name, count))
-            } else {
-                Cow::Borrowed(name)
-            }
-        };
+#[derive(Default)]
+struct Parameters<'a>(Vec<Parameter<'a>>);
 
-        let function_gen = impl_gen
-            .new_fn(&function_name)
-            .vis("pub unsafe")
-            .arg_mut_self();
+impl<'a> TryFrom<&'a Function> for Parameters<'a> {
+    type Error = Error;
 
-        let flags = function.flags;
-
-        let mut parameters: Vec<&Property> = function
+    fn try_from(method: &Function) -> Result<Parameters, Self::Error> { unsafe {
+        let parameters = method
             .iter_children()
-            .filter(|p| p.element_size > 0)
-            .collect();
+            .filter(|p| p.element_size > 0);
 
-        parameters.sort_by(|p, q| property_compare(p, q));
+        let mut ret = Parameters::default();
 
-        let mut counts: HashMap<&str, usize> = HashMap::new();
+        let mut parameter_name_counts = HashMap::new();
 
         for parameter in parameters {
-            let info = PropertyInfo::try_from(parameter)?;
-            let name = {
-                let name = helper::get_name(parameter as &Object)?;
-                let count = *counts.entry(name).and_modify(|c| *c += 1).or_default();
-
-                if count > 0 {
-                    Cow::Owned(format!("{}_{}", name, count))
-                } else {
-                    Cow::Borrowed(scrub_reserved_name(name))
-                }
+            let kind = if parameter.is_out_param() || parameter.is_return_param() {
+                ParameterKind::Output
+            } else if parameter.is_param() {
+                ParameterKind::Input
+            } else {
+                continue;
             };
 
-            function_gen.arg(&name, info.as_typed_comment().as_ref());
+            let name = helper::get_name(parameter as &Object)?;
+            let name = get_unique_name(&mut parameter_name_counts, name);
+            let typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
+            ret.0.push(Parameter { parameter, kind, name, typ });
         }
+
+        ret.0.sort_by(|p, q| property_compare(p.parameter, q.parameter));
+
+        Ok(ret)
+    }}
+}
+
+unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str, u8>, method: &Function) -> Result<(), Error> {
+    let name = get_unique_name(
+        method_name_counts,
+        helper::get_name(method as &Object)?
+    );
+
+    let method_gen = impl_gen
+        .new_fn(&name)
+        .vis("pub unsafe")
+        .line("static mut FUNCTION: Option<*mut Function> = None;")
+        .arg_mut_self();
+
+    let parameters = Parameters::try_from(method)?;
+    
+    let input_parameters = parameters.0.iter().filter(|p| p.kind == ParameterKind::Input);
+    
+    for input in input_parameters {
+        method_gen.arg(&input.name, input.typ.as_ref());
     }
 
     Ok(())
