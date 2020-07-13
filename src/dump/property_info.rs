@@ -88,9 +88,9 @@ impl PropertyInfo {
         }
     }
 
-    pub fn as_typed_comment(&self) -> Cow<str> {
+    pub fn into_typed_comment(self) -> Cow<'static, str> {
         if self.comment.is_empty() {
-            Cow::Borrowed(&self.field_type)
+            self.field_type
         } else {
             Cow::Owned(format!("{} /* {} */", self.field_type, self.comment))
         }
