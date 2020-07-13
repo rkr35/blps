@@ -207,7 +207,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let object: *const Enum = object.cast();
 
-    let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut variant_name_counts: HashMap<&str, u8> = HashMap::new();
     let mut common_prefix: Option<Vec<&str>> = None;
 
     let variants: Result<Vec<Cow<str>>, Error> = (*object)
@@ -229,13 +229,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
                 common_prefix = Some(variant.split('_').collect());
             }
 
-            let count = counts.entry(variant).and_modify(|c| *c += 1).or_default();
-
-            if *count == 0 {
-                Ok(variant.into())
-            } else {
-                Ok(format!("{}_{}", variant, *count).into())
-            }
+            Ok(get_unique_name(&mut variant_name_counts, variant))
         })
         .collect();
 
@@ -373,7 +367,8 @@ unsafe fn add_fields(
     properties: Vec<&Property>,
 ) -> Result<Bitfields, Error> {
     let mut bitfields = Bitfields::new();
-    let mut counts: HashMap<&str, usize> = HashMap::with_capacity(properties.len());
+
+    let mut field_name_counts: HashMap<&str, u8> = HashMap::with_capacity(properties.len());
 
     for property in properties {
         if *offset < property.offset {
@@ -402,19 +397,15 @@ unsafe fn add_fields(
             name = bitfield::FIELD;
         }
 
-        let field_name = {
-            let count = counts.entry(name).and_modify(|c| *c += 1).or_default();
+        let field_name = format!(
+            "pub {}",
+            get_unique_name(
+                &mut field_name_counts,
+                scrub_reserved_name(name)
+            )
+        );
 
-            let name = scrub_reserved_name(name);
-
-            if *count == 0 {
-                format!("pub {}", name)
-            } else {
-                format!("pub {}_{}", name, *count)
-            }
-        };
-
-        let mut field_type = info.as_typed_comment();
+        let mut field_type = info.into_typed_comment();
 
         if property.array_dim > 1 {
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
@@ -560,4 +551,17 @@ unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Erro
     }
 
     Ok(())
+}
+
+unsafe fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
+    let count = *name_counts
+        .entry(name)
+        .and_modify(|c| *c += 1)
+        .or_default();
+
+    if count == 0 {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(format!("{}_{}", name, count))
+    }
 }
