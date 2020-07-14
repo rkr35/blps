@@ -587,7 +587,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     Ok(())
 }
 
-unsafe fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
+fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
     let count = *name_counts
         .entry(name)
         .and_modify(|c| *c += 1)
