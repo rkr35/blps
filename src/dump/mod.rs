@@ -522,7 +522,7 @@ enum ParameterKind {
 }
 
 struct Parameter<'a> {
-    parameter: &'a Property,
+    property: &'a Property,
     kind: ParameterKind,
     name: Cow<'a, str>,
     typ: Cow<'a, str>,
@@ -555,10 +555,10 @@ impl<'a> TryFrom<&'a Function> for Parameters<'a> {
             let name = helper::get_name(parameter as &Object)?;
             let name = get_unique_name(&mut parameter_name_counts, name);
             let typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
-            ret.0.push(Parameter { parameter, kind, name, typ });
+            ret.0.push(Parameter { property: parameter, kind, name, typ });
         }
 
-        ret.0.sort_by(|p, q| property_compare(p.parameter, q.parameter));
+        ret.0.sort_by(|p, q| property_compare(p.property, q.property));
 
         Ok(ret)
     }}
