@@ -553,6 +553,7 @@ impl<'a> TryFrom<&'a Function> for Parameters<'a> {
             };
 
             let name = helper::get_name(parameter as &Object)?;
+            let name = scrub_reserved_name(name);
             let name = get_unique_name(&mut parameter_name_counts, name);
             let typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
             ret.0.push(Parameter { property: parameter, kind, name, typ });
