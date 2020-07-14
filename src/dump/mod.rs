@@ -579,11 +579,34 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
 
     let parameters = Parameters::try_from(method)?;
     
-    let input_parameters = parameters.0.iter().filter(|p| p.kind == ParameterKind::Input);
-    
-    for input in input_parameters {
-        method_gen.arg(&input.name, input.typ.as_ref());
+    let mut structure = Block::new("#[repr(C)]\nstruct Parameters");
+    let mut structure_init = Block::new("let mut p = Parameters");
+
+    // TODO: ARRAY PARAMETERS: Parameters `p` such that `p.property.array_dim > 1`
+    for parameter in parameters.0 {
+        match parameter.kind {
+            ParameterKind::Input => {
+                method_gen.arg(&parameter.name, parameter.typ.as_ref());
+                structure.line(format!("{}: {},", parameter.name, parameter.typ));
+                structure_init.line(format!("{},", parameter.name));
+            }
+
+            ParameterKind::Output => {
+                structure.line(format!("{}: MaybeUninit<{}>,", parameter.name, parameter.typ));
+                structure_init.line(format!("{}: MaybeUninit::uninit(),", parameter.name));
+            }
+        }
     }
+
+    let mut if_block = Block::new("if let Some(function) = FUNCTION");
+    
+    structure.after("\n");
+    if_block.push_block(structure);
+
+    structure_init.after(";");
+    if_block.push_block(structure_init);
+
+    method_gen.push_block(if_block);
 
     Ok(())
 }
