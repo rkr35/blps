@@ -145,6 +145,7 @@ fn add_imports(scope: &mut Scope) {
     scope.raw(
         "use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
          use crate::hook::bitfield::{is_bit_set, set_bit};\n\
+         use std::mem::MaybeUninit;\n\
          use std::ops::{Deref, DerefMut};",
     );
 }
