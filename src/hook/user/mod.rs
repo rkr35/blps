@@ -30,7 +30,7 @@ pub unsafe fn process_event(this: *mut Object, method: *mut Function, parameters
 
 unsafe fn my_post_render(canvas: *mut *mut Canvas) {
     let canvas = *canvas;
-    (*canvas).SetPos(100.0, 100.0, 0.0);
+    (*canvas).SetPos(200.0, 200.0, 0.0);
     (*canvas).DrawBox(200.0, 200.0);
 }
 
