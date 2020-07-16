@@ -627,34 +627,39 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
 
     if_block.line("(*function).flags = old_flags;");
 
-    if return_tuple.len() == 1 {
-        let (ident, typ) = &return_tuple[0];
-        if_block.line(format!("\nSome({})", ident));
-        method_gen.ret(format!("Option<{}>", typ));
-    } else if return_tuple.len() > 1 {
-        let mut idents = String::from("\nSome((");
-        let mut ret = String::from("Option<(");
+    match &return_tuple[..] {
+        [] => (),
 
-        for (ident, typ) in &return_tuple {
-            idents.push_str(ident);
-            idents.push_str(", ");
-
-            ret.push_str(typ);
-            ret.push_str(", ");
+        [(ident, typ)] => {
+            if_block.line(format!("\nSome({})", ident));
+            method_gen.ret(format!("Option<{}>", typ));
         }
 
-        // Remove trailing ", "
-        idents.pop();
-        idents.pop();
-
-        ret.pop();
-        ret.pop();
-
-        idents.push_str("))");
-        ret.push_str(")>");
-
-        if_block.line(idents);
-        method_gen.ret(ret);
+        _ => {
+            let mut idents = String::from("\nSome((");
+            let mut ret = String::from("Option<(");
+        
+            for (ident, typ) in &return_tuple {
+                idents.push_str(ident);
+                idents.push_str(", ");
+        
+                ret.push_str(typ);
+                ret.push_str(", ");
+            }
+        
+            // Remove trailing ", "
+            idents.pop();
+            idents.pop();
+        
+            ret.pop();
+            ret.pop();
+        
+            idents.push_str("))");
+            ret.push_str(")>");
+        
+            if_block.line(idents);
+            method_gen.ret(ret);
+        }
     }
 
     if_block.after(" else");
