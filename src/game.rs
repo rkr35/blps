@@ -303,6 +303,13 @@ impl DerefMut for Function {
     }
 }
 
+impl Function {
+    pub fn is_native(&self) -> bool {
+        const NATIVE: u32 = 0x400;
+        self.flags & NATIVE == NATIVE
+    }
+}
+
 #[repr(C)]
 pub struct State {
     pub struct_base: Struct,

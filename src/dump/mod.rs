@@ -143,7 +143,8 @@ fn add_crate_attributes(scope: &mut Scope) {
 
 fn add_imports(scope: &mut Scope) {
     scope.raw(
-        "use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+        "use crate::GLOBAL_OBJECTS;\n\
+         use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
          use crate::hook::bitfield::{is_bit_set, set_bit};\n\
          use std::mem::MaybeUninit;\n\
          use std::ops::{Deref, DerefMut};",
@@ -590,6 +591,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     
     let mut structure = Block::new("#[repr(C)]\nstruct Parameters");
     let mut structure_init = Block::new("let mut p = Parameters");
+    let mut return_tuple = vec![];
 
     // TODO: ARRAY PARAMETERS: Parameters `p` such that `p.property.array_dim > 1`
     for parameter in parameters.0 {
@@ -603,6 +605,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
             ParameterKind::Output => {
                 structure.line(format!("{}: MaybeUninit<{}>,", parameter.name, parameter.typ));
                 structure_init.line(format!("{}: MaybeUninit::uninit(),", parameter.name));
+                return_tuple.push((format!("p.{}.assume_init()", parameter.name), parameter.typ));
             }
         }
     }
@@ -612,10 +615,64 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     structure.after("\n");
     if_block.push_block(structure);
 
-    structure_init.after(";");
+    structure_init.after(";\n");
     if_block.push_block(structure_init);
+    
+    if_block.line("let old_flags = (*function).flags;");
 
+    if method.is_native() {
+        if_block.line("(*function).flags |= 0x400;");
+    }
+
+    if_block.line("self.process_event(function, &mut p as *mut Parameters as *mut _);");
+
+    if_block.line("(*function).flags = old_flags;");
+
+    if return_tuple.len() == 1 {
+        let (ident, typ) = &return_tuple[0];
+        if_block.line(format!("\nSome({})", ident));
+        method_gen.ret(format!("Option<{}>", typ));
+    } else if return_tuple.len() > 1 {
+        let mut idents = String::from("\nSome((");
+        let mut ret = String::from("Option<(");
+
+        for (ident, typ) in return_tuple.iter() {
+            idents.push_str(ident);
+            idents.push_str(", ");
+
+            ret.push_str(typ);
+            ret.push_str(", ");
+        }
+
+        // Remove trailing ", "
+        idents.pop();
+        idents.pop();
+
+        ret.pop();
+        ret.pop();
+
+        idents.push_str("))");
+        ret.push_str(")>");
+
+        if_block.line(idents);
+        method_gen.ret(ret);
+    }
+
+    if_block.after(" else");
+
+    let mut else_block = Block::new("");
+    
+    else_block.line(format!(
+        "FUNCTION = (*GLOBAL_OBJECTS).find_mut(\"{}\").map(|o| o.cast());",
+        helper::get_full_name(method as &Object)?
+    ));
+
+    if !return_tuple.is_empty() {
+        else_block.line("None");
+    }
+    
     method_gen.push_block(if_block);
+    method_gen.push_block(else_block);
 
     Ok(())
 }
