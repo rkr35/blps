@@ -1,4 +1,4 @@
-use crate::game::{cast, Function, Object};
+use crate::game::{Function, Object};
 use crate::hook::sdk::{Canvas, WillowPlayerController};
 
 use super::CACHED_FUNCTION_INDEXES;
