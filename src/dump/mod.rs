@@ -636,7 +636,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
         let mut idents = String::from("\nSome((");
         let mut ret = String::from("Option<(");
 
-        for (ident, typ) in return_tuple.iter() {
+        for (ident, typ) in &return_tuple {
             idents.push_str(ident);
             idents.push_str(", ");
 
