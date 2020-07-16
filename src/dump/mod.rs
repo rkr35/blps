@@ -19,6 +19,8 @@ use thiserror::Error;
 mod bitfield;
 use bitfield::{Bitfields, PostAddInstruction};
 
+mod genial;
+
 mod helper;
 
 mod property_info;
