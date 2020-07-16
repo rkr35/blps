@@ -1,4 +1,4 @@
-use crate::game::{cast, Function, Object};
+use crate::game::{Function, Object};
 use crate::hook::sdk::{Canvas, WillowPlayerController};
 
 use super::CACHED_FUNCTION_INDEXES;
@@ -30,7 +30,7 @@ pub unsafe fn process_event(this: *mut Object, method: *mut Function, parameters
 
 unsafe fn my_post_render(canvas: *mut *mut Canvas) {
     let canvas = *canvas;
-    (*canvas).SetPos(100.0, 100.0, 0.0);
+    (*canvas).SetPos(200.0, 200.0, 0.0);
     (*canvas).DrawBox(200.0, 200.0);
 }
 
@@ -46,7 +46,7 @@ unsafe fn my_player_destroyed() {
     info!("Destroyed CONTROLLER.");
 }
 
-fn print_event(object: &Object, method: &Function) {
+fn _print_event(object: &Object, method: &Function) {
     if let Some(object) = unsafe { object.full_name() } {
         if let Some(method) = unsafe { method.full_name() } {
             info!("{} called {}", object, method);

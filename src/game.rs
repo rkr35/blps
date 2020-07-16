@@ -196,6 +196,15 @@ impl DerefMut for Struct {
     }
 }
 
+impl Struct {
+    pub unsafe fn iter_children(&self) -> impl Iterator<Item = &Property> {
+        iter::successors(
+            self.children.cast::<Property>().as_ref(),
+            |property| property.next.cast::<Property>().as_ref(),
+        )
+    }
+}
+
 pub type FString = Array<u16>; // &[u16] -> OsString -> Cow<str>
 
 impl FString {
@@ -294,6 +303,13 @@ impl DerefMut for Function {
     }
 }
 
+impl Function {
+    pub fn is_native(&self) -> bool {
+        const NATIVE: u32 = 0x400;
+        self.flags & NATIVE == NATIVE
+    }
+}
+
 #[repr(C)]
 pub struct State {
     pub struct_base: Struct,
@@ -360,6 +376,23 @@ impl DerefMut for Property {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.field
     }
+}
+
+impl Property {
+    pub fn is_return_param(&self) -> bool {
+        const RETURN_PARAM: u32 = 0x400;
+        self.property_flags_0 & RETURN_PARAM == RETURN_PARAM
+    }
+    
+    pub fn is_out_param(&self) -> bool {
+        const OUT_PARAM: u32 = 0x100;
+        self.property_flags_0 & OUT_PARAM == OUT_PARAM
+    }
+
+    pub fn is_param(&self) -> bool {
+        const PARAM: u32 = 0x80;
+        self.property_flags_0 & PARAM == PARAM
+    }    
 }
 
 #[repr(C)]

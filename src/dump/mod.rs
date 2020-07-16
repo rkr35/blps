@@ -1,4 +1,4 @@
-use crate::game::{cast, BoolProperty, Class, Const, Enum, Object, Property, Struct};
+use crate::game::{cast, BoolProperty, Class, Const, Enum, Function, Object, Property, Struct};
 use crate::TimeIt;
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 
@@ -7,12 +7,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::OsString;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
-use std::iter;
 use std::ptr;
 
-use codegen::{Field, Scope, Struct as StructGen, Type};
+use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
 use heck::CamelCase;
 use log::info;
 use thiserror::Error;
@@ -49,7 +48,7 @@ pub enum Error {
     PropertyInfo(#[from] property_info::Error),
 
     #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
-    PropertySizeMismatch(*const Property, u32, PropertyInfo),
+    PropertySizeMismatch(*const Property, i64, PropertyInfo),
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
@@ -103,7 +102,6 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     find_static_classes()?;
 
-    let mut sdk = File::create(SDK_PATH)?;
     let mut scope = Scope::new();
 
     add_crate_attributes(&mut scope);
@@ -113,7 +111,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
         write_object(&mut scope, object)?;
     }
 
-    writeln!(&mut sdk, "{}", scope.to_string())?;
+    fs::write(SDK_PATH, scope.to_string())?;
 
     Ok(())
 }
@@ -134,7 +132,8 @@ unsafe fn find_static_classes() -> Result<(), Error> {
 
 fn add_crate_attributes(scope: &mut Scope) {
     scope.raw(
-        "#![allow(clippy::doc_markdown)]\n\
+        "#![allow(bindings_with_variant_name)]\n\
+         #![allow(clippy::doc_markdown)]\n\
          #![allow(dead_code)]\n\
          #![allow(non_camel_case_types)]\n\
          #![allow(non_snake_case)]",
@@ -143,8 +142,10 @@ fn add_crate_attributes(scope: &mut Scope) {
 
 fn add_imports(scope: &mut Scope) {
     scope.raw(
-        "use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+        "use crate::GLOBAL_OBJECTS;\n\
+         use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
          use crate::hook::bitfield::{is_bit_set, set_bit};\n\
+         use std::mem::MaybeUninit;\n\
          use std::ops::{Deref, DerefMut};",
     );
 }
@@ -207,7 +208,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let object: *const Enum = object.cast();
 
-    let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut variant_name_counts: HashMap<&str, u8> = HashMap::new();
     let mut common_prefix: Option<Vec<&str>> = None;
 
     let variants: Result<Vec<Cow<str>>, Error> = (*object)
@@ -229,13 +230,7 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
                 common_prefix = Some(variant.split('_').collect());
             }
 
-            let count = counts.entry(variant).and_modify(|c| *c += 1).or_default();
-
-            if *count == 0 {
-                Ok(variant.into())
-            } else {
-                Ok(format!("{}_{}", variant, *count).into())
-            }
+            Ok(get_unique_name(&mut variant_name_counts, variant))
         })
         .collect();
 
@@ -324,7 +319,7 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
         struct_gen.doc(&doc);
     }
 
-    let properties = get_properties(structure, offset);
+    let properties = get_fields(structure, offset);
     let bitfields = add_fields(struct_gen, &mut offset, properties)?;
 
     if offset < structure_size {
@@ -342,31 +337,29 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
     Ok(())
 }
 
-unsafe fn get_properties(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
-    let properties = iter::successors(
-        (*structure).children.cast::<Property>().as_ref(),
-        |property| property.next.cast::<Property>().as_ref(),
-    );
-
-    let mut properties: Vec<&Property> = properties
+unsafe fn get_fields(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
+    let mut properties: Vec<&Property> = (*structure)
+        .iter_children()
         .filter(|p| p.element_size > 0)
         .filter(|p| p.offset >= offset)
         .filter(|p| !p.is(STRUCTURE) && !p.is(CONSTANT) & !p.is(ENUMERATION) && !p.is(FUNCTION))
         .collect();
 
-    properties.sort_by(|p, q| {
-        p.offset.cmp(&q.offset).then_with(|| {
-            if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
-                let p: &BoolProperty = cast(p);
-                let q: &BoolProperty = cast(q);
-                p.bitmask.cmp(&q.bitmask)
-            } else {
-                Ordering::Equal
-            }
-        })
-    });
+    properties.sort_by(|p, q| property_compare(p, q));
 
     properties
+}
+
+unsafe fn property_compare(p: &Property, q: &Property) -> Ordering {
+    p.offset.cmp(&q.offset).then_with(|| {
+        if p.is(BOOL_PROPERTY) && q.is(BOOL_PROPERTY) {
+            let p: &BoolProperty = cast(p);
+            let q: &BoolProperty = cast(q);
+            p.bitmask.cmp(&q.bitmask)
+        } else {
+            Ordering::Equal
+        }
+    })
 }
 
 unsafe fn add_fields(
@@ -375,7 +368,8 @@ unsafe fn add_fields(
     properties: Vec<&Property>,
 ) -> Result<Bitfields, Error> {
     let mut bitfields = Bitfields::new();
-    let mut counts: HashMap<&str, usize> = HashMap::with_capacity(properties.len());
+
+    let mut field_name_counts: HashMap<&str, u8> = HashMap::with_capacity(properties.len());
 
     for property in properties {
         if *offset < property.offset {
@@ -385,9 +379,10 @@ unsafe fn add_fields(
         let info = PropertyInfo::try_from(property)?;
 
         let total_property_size = property.element_size * property.array_dim;
-        let size_mismatch = total_property_size - info.size * property.array_dim;
+        
+        let size_mismatch = i64::from(total_property_size) - i64::from(info.size * property.array_dim);
 
-        if size_mismatch > 0 {
+        if size_mismatch != 0 {
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
         }
 
@@ -403,23 +398,15 @@ unsafe fn add_fields(
             name = bitfield::FIELD;
         }
 
-        let field_name = {
-            let count = counts.entry(name).and_modify(|c| *c += 1).or_default();
+        let field_name = format!(
+            "pub {}",
+            get_unique_name(
+                &mut field_name_counts,
+                scrub_reserved_name(name)
+            )
+        );
 
-            let name = scrub_reserved_name(name);
-
-            if *count == 0 {
-                format!("pub {}", name)
-            } else {
-                format!("pub {}_{}", name, *count)
-            }
-        };
-
-        let mut field_type = if info.comment.is_empty() {
-            info.field_type
-        } else {
-            format!("{} /* {} */", info.field_type, info.comment).into()
-        };
+        let mut field_type = info.into_typed_comment();
 
         if property.array_dim > 1 {
             field_type = format!("[{}; {}]", field_type, property.array_dim).into();
@@ -504,5 +491,205 @@ fn add_object_deref_impl(sdk: &mut Scope) {
 }
 
 unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
-    write_structure(sdk, object)
+    write_structure(sdk, object)?;
+    add_methods(sdk, object.cast())?;
+    Ok(())
+}
+
+unsafe fn add_methods(sdk: &mut Scope, class: *const Struct) -> Result<(), Error> {
+    let name = helper::resolve_duplicate(class.cast())?;
+    let impl_gen = sdk.new_impl(&name);
+
+    let mut method_name_counts: HashMap<&str, u8> = HashMap::new();
+
+    for method in get_methods(class) {
+        add_method(impl_gen, &mut method_name_counts, method)?;
+    }
+
+    Ok(())
+}
+
+unsafe fn get_methods(class: *const Struct) -> impl Iterator<Item = &'static Function> {
+    (*class)
+        .iter_children()
+        .filter(|p| p.is(FUNCTION))
+        .map(|p| cast::<Function>(p))
+}
+
+#[derive(PartialEq, Eq)]
+enum ParameterKind {
+    Input,
+    Output,
+}
+
+struct Parameter<'a> {
+    property: &'a Property,
+    kind: ParameterKind,
+    name: Cow<'a, str>,
+    typ: Cow<'a, str>,
+}
+
+#[derive(Default)]
+struct Parameters<'a>(Vec<Parameter<'a>>);
+
+impl<'a> TryFrom<&'a Function> for Parameters<'a> {
+    type Error = Error;
+
+    fn try_from(method: &Function) -> Result<Parameters, Self::Error> { unsafe {
+        let parameters = method
+            .iter_children()
+            .filter(|p| p.element_size > 0);
+
+        let mut ret = Parameters::default();
+
+        let mut parameter_name_counts = HashMap::new();
+
+        for parameter in parameters {
+            let kind = if parameter.is_out_param() || parameter.is_return_param() {
+                ParameterKind::Output
+            } else if parameter.is_param() {
+                ParameterKind::Input
+            } else {
+                continue;
+            };
+
+            let name = helper::get_name(parameter as &Object)?;
+            let name = scrub_reserved_name(name);
+            let name = get_unique_name(&mut parameter_name_counts, name);
+            let mut typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
+
+            if typ == "u32" {
+                // Special case: Apparently `BoolProperty` is "u32" in
+                // structure/class definitions, but "bool" when in method
+                // parameters.
+                typ = "bool".into();
+            }
+
+            ret.0.push(Parameter { property: parameter, kind, name, typ });
+        }
+
+        ret.0.sort_by(|p, q| property_compare(p.property, q.property));
+
+        Ok(ret)
+    }}
+}
+
+unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str, u8>, method: &Function) -> Result<(), Error> {
+    let name = get_unique_name(
+        method_name_counts,
+        helper::get_name(method as &Object)?
+    );
+
+    let method_gen = impl_gen
+        .new_fn(&name)
+        .vis("pub unsafe")
+        .line("static mut FUNCTION: Option<*mut game::Function> = None;\n")
+        .arg_mut_self();
+
+    let parameters = Parameters::try_from(method)?;
+    
+    let mut structure = Block::new("#[repr(C)]\nstruct Parameters");
+    let mut structure_init = Block::new("let mut p = Parameters");
+    let mut return_tuple = vec![];
+
+    // TODO: ARRAY PARAMETERS: Parameters `p` such that `p.property.array_dim > 1`
+    for parameter in parameters.0 {
+        match parameter.kind {
+            ParameterKind::Input => {
+                method_gen.arg(&parameter.name, parameter.typ.as_ref());
+                structure.line(format!("{}: {},", parameter.name, parameter.typ));
+                structure_init.line(format!("{},", parameter.name));
+            }
+
+            ParameterKind::Output => {
+                structure.line(format!("{}: MaybeUninit<{}>,", parameter.name, parameter.typ));
+                structure_init.line(format!("{}: MaybeUninit::uninit(),", parameter.name));
+                return_tuple.push((format!("p.{}.assume_init()", parameter.name), parameter.typ));
+            }
+        }
+    }
+
+    let mut if_block = Block::new("if let Some(function) = FUNCTION");
+    
+    structure.after("\n");
+    if_block.push_block(structure);
+
+    structure_init.after(";\n");
+    if_block.push_block(structure_init);
+    
+    if_block.line("let old_flags = (*function).flags;");
+
+    if method.is_native() {
+        if_block.line("(*function).flags |= 0x400;");
+    }
+
+    if_block.line("self.process_event(function, &mut p as *mut Parameters as *mut _);");
+
+    if_block.line("(*function).flags = old_flags;");
+
+    match &return_tuple[..] {
+        [] => (),
+
+        [(ident, typ)] => {
+            if_block.line(format!("\nSome({})", ident));
+            method_gen.ret(format!("Option<{}>", typ));
+        }
+
+        _ => {
+            let mut idents = String::from("\nSome((");
+            let mut ret = String::from("Option<(");
+        
+            for (ident, typ) in &return_tuple {
+                idents.push_str(ident);
+                idents.push_str(", ");
+        
+                ret.push_str(typ);
+                ret.push_str(", ");
+            }
+        
+            // Remove trailing ", "
+            idents.pop();
+            idents.pop();
+        
+            ret.pop();
+            ret.pop();
+        
+            idents.push_str("))");
+            ret.push_str(")>");
+        
+            if_block.line(idents);
+            method_gen.ret(ret);
+        }
+    }
+
+    if_block.after(" else");
+
+    let mut else_block = Block::new("");
+    
+    else_block.line(format!(
+        "FUNCTION = (*GLOBAL_OBJECTS).find_mut(\"{}\").map(|o| o.cast());",
+        helper::get_full_name(method as &Object)?
+    ));
+
+    if !return_tuple.is_empty() {
+        else_block.line("None");
+    }
+    
+    method_gen.push_block(if_block);
+    method_gen.push_block(else_block);
+
+    Ok(())
+}
+
+fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
+    let count = *name_counts
+        .entry(name)
+        .and_modify(|c| *c += 1)
+        .or_default();
+
+    if count == 0 {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(format!("{}_{}", name, count))
+    }
 }

@@ -1,4 +1,5 @@
 #![warn(clippy::pedantic)]
+#![allow(clippy::filter_map)]
 #![allow(clippy::find_map)]
 
 #[cfg(not(all(target_arch = "x86", target_os = "windows")))]

@@ -87,6 +87,14 @@ impl PropertyInfo {
             comment: "".into(),
         }
     }
+
+    pub fn into_typed_comment(self) -> Cow<'static, str> {
+        if self.comment.is_empty() {
+            self.field_type
+        } else {
+            Cow::Owned(format!("{} /* {} */", self.field_type, self.comment))
+        }
+    }
 }
 
 impl TryFrom<&Property> for PropertyInfo {

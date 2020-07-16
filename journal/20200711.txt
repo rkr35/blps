@@ -1,0 +1,16 @@
+Emitting class methods:
+    [x] Emit `impl` block
+
+    [x] Emit method name
+    
+    [] Emit method arguments
+        [] Primitives
+        [] Bool special case
+        [] Optional Parameters
+        [] Out Parameters
+        [] Arrays
+    
+    [] Emit method return type
+    
+    [] Call ProcessEvent
+        []
