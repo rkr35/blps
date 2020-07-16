@@ -583,7 +583,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     let method_gen = impl_gen
         .new_fn(&name)
         .vis("pub unsafe")
-        .line("static mut FUNCTION: Option<*mut Function> = None;\n")
+        .line("static mut FUNCTION: Option<*mut game::Function> = None;\n")
         .arg_mut_self();
 
     let parameters = Parameters::try_from(method)?;
