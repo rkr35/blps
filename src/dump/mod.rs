@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::OsString;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::ptr;
 
@@ -102,7 +102,6 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     find_static_classes()?;
 
-    let mut sdk = File::create(SDK_PATH)?;
     let mut scope = Scope::new();
 
     add_crate_attributes(&mut scope);
@@ -112,7 +111,7 @@ pub unsafe fn sdk() -> Result<(), Error> {
         write_object(&mut scope, object)?;
     }
 
-    writeln!(&mut sdk, "{}", scope.to_string())?;
+    fs::write(SDK_PATH, scope.to_string())?;
 
     Ok(())
 }
