@@ -46,7 +46,7 @@ unsafe fn my_player_destroyed() {
     info!("Destroyed CONTROLLER.");
 }
 
-fn print_event(object: &Object, method: &Function) {
+fn _print_event(object: &Object, method: &Function) {
     if let Some(object) = unsafe { object.full_name() } {
         if let Some(method) = unsafe { method.full_name() } {
             info!("{} called {}", object, method);
