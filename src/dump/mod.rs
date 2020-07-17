@@ -19,6 +19,7 @@ use thiserror::Error;
 mod bitfield;
 use bitfield::{Bitfields, PostAddInstruction};
 
+#[cfg(feature = "genial")]
 mod genial;
 
 mod helper;
