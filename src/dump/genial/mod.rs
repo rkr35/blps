@@ -63,6 +63,11 @@ impl<W: Write> Scope<W> {
         ind_ln!(self.indent, "struct {} {{", name)?;
         Ok(Structure { indent: self.indent.nest() })
     }
+
+    pub fn structure_attr(&mut self, attributes: impl Display, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+        ind_ln!(self.indent, "{}", attributes)?;
+        self.structure(name)
+    }
 }
 
 pub struct Structure<W: Write> {
@@ -106,5 +111,19 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, "struct Test {\n}\n");
+    }
+
+    #[test]
+    fn structure_repr_c() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Indent::new(&mut buffer));
+            let _structure = scope.structure_attr("#[repr(C)]", "Test");
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_repr_c.expected"));
     }
 }
