@@ -50,6 +50,15 @@ impl Default for Visibility {
     }
 }
 
+impl Display for Visibility {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Self::Private => Ok(()),
+            Self::Public => write!(f, "pub "),
+        }
+    }
+}
+
 pub struct Scope<W: Write> {
     writer: Writer<W>,
 }
