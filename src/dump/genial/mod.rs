@@ -119,6 +119,14 @@ impl<W: Write> Scope<W> {
             writer: self.writer.nest(),
         })
     }
+
+    pub fn imp_trait(&mut self, r#trait: impl Display, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
+        ind_ln!(self.writer, "impl {} for {} {{", r#trait, target)?;
+
+        Ok(Impl {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 pub struct Structure<W: Write> {
@@ -426,5 +434,19 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("impl_empty.expected"));
+    }
+
+    #[test]
+    fn impl_trait_empty() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _imp = scope.imp_trait("Trait", "Struct").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_trait_empty.expected"));
     }
 }
