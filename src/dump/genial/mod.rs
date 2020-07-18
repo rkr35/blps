@@ -184,6 +184,24 @@ mod tests {
     }
 
     #[test]
+    fn structure_multiline_annotation() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _structure = scope
+                .annotate("#[repr(C)]").unwrap()
+                .annotate("/// Second line").unwrap()
+                .annotate("/// Third line").unwrap()
+                .structure(Visibility::Private,"Test").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_multiline_annotation.expected"));
+    }
+
+    #[test]
     fn structure_single_field() {
         let mut buffer = vec![];
 
