@@ -65,7 +65,7 @@ macro_rules! impl_writer_wrapper {
     }
 }
 
-impl_writer_wrapper!{ Scope Structure }
+impl_writer_wrapper!{ Scope Structure Enumeration }
 
 pub enum Visibility {
     Private,
@@ -103,6 +103,14 @@ impl<W: Write> Scope<W> {
             writer: self.writer.nest(),
         })
     }
+
+    pub fn enumeration(&mut self, vis: Visibility, name: impl Display) -> Result<Enumeration<&mut W>, io::Error> {
+        ind_ln!(self.writer, "{}enum {} {{", vis, name)?;
+
+        Ok(Enumeration {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 pub struct Structure<W: Write> {
@@ -117,6 +125,24 @@ impl<W: Write> Structure<W> {
 }
 
 impl<W: Write> Drop for Structure<W> {
+    fn drop(&mut self) {
+        let indent = self.writer.unnest();
+        ind_ln!(indent, "}}").unwrap();
+    }
+}
+
+pub struct Enumeration<W: Write> {
+    writer: Writer<W>,
+}
+
+impl<W: Write> Enumeration<W> {
+    pub fn variant(&mut self, variant: impl Display) -> Result<&mut Self, io::Error> {
+        ind_ln!(self.writer, "{},", variant)?;
+        Ok(self)
+    }
+}
+
+impl<W: Write> Drop for Enumeration<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
@@ -291,5 +317,20 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("structure_annotate_fields.expected"));
+    }
+
+    #[test]
+    fn enum_single_variant() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let mut e = scope.enumeration(Visibility::Private, "TestEnum").unwrap();
+            e.variant("TestVariant1").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("enum_single_variant.expected"));
     }
 }
