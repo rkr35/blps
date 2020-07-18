@@ -1,3 +1,4 @@
+#[repr(u8)]
 enum TestEnum {
     // Test annotation for first variant.
     #[test(attr)]

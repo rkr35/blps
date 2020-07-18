@@ -355,7 +355,9 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let mut e = scope.enumeration(Visibility::Private, "TestEnum").unwrap();
+            let mut e = scope
+                .annotate("#[repr(u8)]").unwrap()
+                .enumeration(Visibility::Private, "TestEnum").unwrap();
 
             e
                 .annotate("// Test annotation for first variant.").unwrap()
