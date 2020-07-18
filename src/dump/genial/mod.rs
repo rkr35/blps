@@ -127,6 +127,14 @@ impl<W: Write> Scope<W> {
             writer: self.writer.nest(),
         })
     }
+
+    pub fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
+        ind_ln!(self.writer, "{}fn {}() {{", vis, name)?;
+
+        Ok(Function {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 pub struct Structure<W: Write> {
@@ -174,6 +182,20 @@ impl<W: Write> Impl<W> {
 }
 
 impl<W: Write> Drop for Impl<W> {
+    fn drop(&mut self) {
+        let indent = self.writer.unnest();
+        ind_ln!(indent, "}}").unwrap();
+    }
+}
+
+pub struct Function<W: Write> {
+    writer: Writer<W>,
+}
+
+impl<W: Write> Function<W> {
+}
+
+impl<W: Write> Drop for Function<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
@@ -464,5 +486,19 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("impl_annotate.expected"));
+    }
+
+    #[test]
+    fn fn_no_args_no_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _function = scope.function(Visibility::Private, "test").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_no_args_no_ret.expected"));
     }
 }
