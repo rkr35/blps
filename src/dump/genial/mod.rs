@@ -202,4 +202,31 @@ mod tests {
 
         assert_eq!(buffer, include_str!("structure_single_field.expected"));
     }
+
+    #[test]
+    fn structure_multiple_fields() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+
+            let mut structure = scope.structure(
+                None::<&str>,
+                Visibility::default(),
+                "Test"
+            ).unwrap();
+
+            structure
+                .field("field1", "u32")
+                .unwrap()
+                .field("field2", "Option<(bool, f32, String, i128)>")
+                .unwrap()
+                .field("field3", format_args!("[{}; {}]", "u8", 32))
+                .unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_multiple_fields.expected"));
+    }
 }
