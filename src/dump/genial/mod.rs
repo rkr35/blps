@@ -39,6 +39,34 @@ impl<W: Write> From<W> for Writer<W> {
     }
 }
 
+pub trait WriterWrapper<W: Write> {
+    fn writer(&mut self) -> &mut Writer<W>;
+}
+
+pub trait Annotate<W: Write> : WriterWrapper<W> {
+    fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
+        let writer = WriterWrapper::writer(self);
+        ind_ln!(writer, "{}", annotation)?;
+        Ok(self)
+    }
+}
+
+impl<W: Write, V: WriterWrapper<W>> Annotate<W> for V {}
+
+macro_rules! impl_writer_wrapper {
+    ($($structure:ident)+) => {
+        $(
+            impl<W: Write> WriterWrapper<W> for $structure<W> {
+                fn writer(&mut self) -> &mut Writer<W> {
+                    &mut self.writer
+                }
+            }
+        )+
+    }
+}
+
+impl_writer_wrapper!{ Scope Structure }
+
 pub enum Visibility {
     Private,
     Public,
@@ -68,11 +96,6 @@ impl<W: Write> Scope<W> {
         Scope { writer }
     }
 
-    pub fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
-        ind_ln!(self.writer, "{}", annotation)?;
-        Ok(self)
-    }
-
     pub fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
         ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
 
@@ -87,11 +110,6 @@ pub struct Structure<W: Write> {
 }
 
 impl<W: Write> Structure<W> {
-    pub fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
-        ind_ln!(self.writer, "{}", annotation)?;
-        Ok(self)
-    }
-
     pub fn field(&mut self, name: impl Display, typ: impl Display) -> Result<&mut Self, io::Error> {
         ind_ln!(self.writer, "{}: {},", name, typ)?;
         Ok(self)
