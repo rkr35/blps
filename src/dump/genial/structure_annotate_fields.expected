@@ -1,0 +1,9 @@
+struct Test {
+    // 0x0(0x4)
+    field1: u32,
+    #[test(attr)]
+    field2: Option<(bool, f32, String, i128)>,
+    // Multi-
+    // Line
+    field3: [u8; 32],
+}

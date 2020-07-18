@@ -86,6 +86,11 @@ pub struct Structure<W: Write> {
 }
 
 impl<W: Write> Structure<W> {
+    pub fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
+        ind_ln!(self.writer, "{}", annotation)?;
+        Ok(self)
+    }
+
     pub fn field(&mut self, name: impl Display, typ: impl Display) -> Result<&mut Self, io::Error> {
         ind_ln!(self.writer, "{}: {},", name, typ)?;
         Ok(self)
@@ -227,5 +232,34 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("structure_multiple_fields.expected"));
+    }
+
+    #[test]
+    fn structure_annotate_fields() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+
+            let mut structure = scope.structure(
+                None::<&str>,
+                Visibility::default(),
+                "Test"
+            ).unwrap();
+
+            structure
+                .annotate("// 0x0(0x4)").unwrap()
+                .field("field1", "u32").unwrap()
+                .annotate("#[test(attr)]").unwrap()
+                .field("field2", "Option<(bool, f32, String, i128)>").unwrap()
+                .annotate("// Multi-").unwrap()
+                .annotate("// Line").unwrap()
+                .field("field3", format_args!("[{}; {}]", "u8", 32)).unwrap()
+                ;
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_annotate_fields.expected"));
     }
 }
