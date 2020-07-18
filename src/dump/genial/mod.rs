@@ -68,12 +68,13 @@ impl<W: Write> Scope<W> {
         Scope { writer }
     }
 
-    pub fn structure(&mut self, annotations: Option<impl Display>, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
-        if let Some(annotations) = annotations {
-            ind_ln!(self.writer, "{}\n{}struct {} {{", annotations, vis, name)?;
-        } else {
-            ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
-        }
+    pub fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
+        ind_ln!(self.writer, "{}", annotation)?;
+        Ok(self)
+    }
+
+    pub fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+        ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
 
         Ok(Structure {
             writer: self.writer.nest(),
@@ -128,7 +129,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(None::<bool>, Visibility::default(), "Test");
+            let _structure = scope.structure(Visibility::default(), "Test").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -142,7 +143,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(None::<bool>, Visibility::Public, "Test");
+            let _structure = scope.structure(Visibility::Public, "Test").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -156,11 +157,9 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(
-                Some("#[repr(C)]"),
-                Visibility::Private,
-                "Test"
-            );
+            let _structure = scope
+                .annotate("#[repr(C)]").unwrap()
+                .structure(Visibility::Private,"Test").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -174,11 +173,9 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(
-                Some("#[repr(C)]"),
-                Visibility::Public,
-                "Test"
-            );
+            let _structure = scope
+                .annotate("#[repr(C)]").unwrap()
+                .structure(Visibility::Public,"Test").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -194,7 +191,6 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                None::<&str>,
                 Visibility::default(),
                 "Test"
             ).unwrap();
@@ -215,7 +211,6 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                None::<&str>,
                 Visibility::default(),
                 "Test"
             ).unwrap();
@@ -242,7 +237,6 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                None::<&str>,
                 Visibility::default(),
                 "Test"
             ).unwrap();
