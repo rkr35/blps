@@ -147,7 +147,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(Visibility::default(), "Test").unwrap();
+            let _structure = scope.structure(Visibility::Private, "Test").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -227,7 +227,7 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                Visibility::default(),
+                Visibility::Private,
                 "Test"
             ).unwrap();
 
@@ -247,7 +247,7 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                Visibility::default(),
+                Visibility::Private,
                 "Test"
             ).unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
 
             let mut structure = scope.structure(
-                Visibility::default(),
+                Visibility::Private,
                 "Test"
             ).unwrap();
 
