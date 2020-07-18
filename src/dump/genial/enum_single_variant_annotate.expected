@@ -1,0 +1,5 @@
+enum TestEnum {
+    // Test annotation for first variant.
+    #[test(attr)]
+    TestVariant1,
+}

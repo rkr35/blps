@@ -348,4 +348,23 @@ mod tests {
 
         assert_eq!(buffer, include_str!("enum_single_variant_public.expected"));
     }
+
+    #[test]
+    fn enum_single_variant_annotate() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let mut e = scope.enumeration(Visibility::Private, "TestEnum").unwrap();
+
+            e
+                .annotate("// Test annotation for first variant.").unwrap()
+                .annotate("#[test(attr)]").unwrap()
+                .variant("TestVariant1").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("enum_single_variant_annotate.expected"));
+    }
 }
