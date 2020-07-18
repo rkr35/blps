@@ -115,8 +115,9 @@ mod tests {
         let mut buffer = vec![];
 
         {
-            let mut scope = Scope::new(Indent::new(&mut buffer));
-            let _structure = scope.structure("Test");
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let attrs: Option<&str> = None;
+            let _structure = scope.structure(attrs, Visibility::default(), "Test");
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
