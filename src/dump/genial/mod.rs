@@ -111,6 +111,14 @@ impl<W: Write> Scope<W> {
             writer: self.writer.nest(),
         })
     }
+
+    pub fn imp(&mut self, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
+        ind_ln!(self.writer, "impl {} {{", target)?;
+
+        Ok(Impl {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 pub struct Structure<W: Write> {
@@ -143,6 +151,21 @@ impl<W: Write> Enumeration<W> {
 }
 
 impl<W: Write> Drop for Enumeration<W> {
+    fn drop(&mut self) {
+        let indent = self.writer.unnest();
+        ind_ln!(indent, "}}").unwrap();
+    }
+}
+
+pub struct Impl<W: Write> {
+    writer: Writer<W>,
+}
+
+impl<W: Write> Impl<W> {
+
+}
+
+impl<W: Write> Drop for Impl<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
@@ -389,5 +412,19 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("enum_multiple_variants.expected"));
+    }
+
+    #[test]
+    fn impl_empty() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _imp = scope.imp("Struct").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_empty.expected"));
     }
 }
