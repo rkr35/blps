@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_structure() {
+    fn structure_empty() {
         let mut buffer = vec![];
 
         {
