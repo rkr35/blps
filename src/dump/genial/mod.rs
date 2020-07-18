@@ -1,40 +1,40 @@
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, Write};
 
-use typed_builder::TypedBuilder;
-
 macro_rules! ind_ln {
-    ($indent:expr, $($arg:tt)*) => (
-        writeln!($indent.writer, "{:indent$}{rest}", "", indent=$indent.indent, rest=format_args!($($arg)*))
+    ($writer:expr, $($arg:tt)*) => (
+        writeln!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
     )   
 }
 
-pub struct Indent<W: Write> {
+pub struct Writer<W: Write> {
     writer: W,
     indent: usize,
 }
 
-impl<W: Write> Indent<W> {
+impl<W: Write> Writer<W> {
     const INDENT: usize = 4;
 
-    pub fn new(writer: W) -> Indent<W> {
-        Indent {
-            writer,
-            indent: 0,
-        }
-    }
-
-    pub fn nest(&mut self) -> Indent<&mut W> {
-        Indent {
+    pub fn nest(&mut self) -> Writer<&mut W> {
+        Writer {
             writer: &mut self.writer,
             indent: self.indent + Self::INDENT,
         }
     }
 
-    pub fn unnest(&mut self) -> Indent<&mut W> {
-        Indent {
+    pub fn unnest(&mut self) -> Writer<&mut W> {
+        Writer {
             writer: &mut self.writer,
             indent: self.indent - Self::INDENT,
+        }
+    }
+}
+
+impl<W: Write> From<W> for Writer<W> {
+    fn from(writer: W) -> Self {
+        Self {
+            writer,
+            indent: 0
         }
     }
 }
@@ -51,12 +51,12 @@ impl Default for Visibility {
 }
 
 pub struct Scope<W: Write> {
-    indent: Indent<W>,
+    writer: Writer<W>,
 }
 
 impl<W: Write> Scope<W> {
-    pub fn new(indent: Indent<W>) -> Scope<W> {
-        Scope { indent }
+    pub fn new(writer: Writer<W>) -> Scope<W> {
+        Scope { writer }
     }
 
     pub fn structure(&mut self, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
@@ -71,12 +71,12 @@ impl<W: Write> Scope<W> {
 }
 
 pub struct Structure<W: Write> {
-    indent: Indent<W>,
+    writer: Writer<W>,
 }
 
 impl<W: Write> Drop for Structure<W> {
     fn drop(&mut self) {
-        let indent = self.indent.unnest();
+        let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
     }
 }
@@ -91,7 +91,7 @@ mod tests {
         let mut buffer = vec![];
 
         {
-            let _scope = Scope::new(Indent::new(&mut buffer));
+            let _scope = Scope::new(Writer::from(&mut buffer));
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
