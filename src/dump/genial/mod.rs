@@ -142,4 +142,22 @@ mod tests {
 
         assert_eq!(buffer, include_str!("structure_repr_c.expected"));
     }
+
+    #[test]
+    fn structure_repr_c_public() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _structure = scope.structure(
+                Some("#[repr(C)]"),
+                Visibility::Public,
+                "Test"
+            );
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_repr_c_public.expected"));
+    }
 }
