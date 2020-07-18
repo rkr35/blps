@@ -68,14 +68,16 @@ impl<W: Write> Scope<W> {
         Scope { writer }
     }
 
-    pub fn structure(&mut self, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
-        ind_ln!(self.indent, "struct {} {{", name)?;
-        Ok(Structure { indent: self.indent.nest() })
-    }
+    pub fn structure(&mut self, attrs: Option<impl Display>, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+        if let Some(attrs) = attrs {
+            ind_ln!(self.writer, "{}\n{}struct {} {{", attrs, vis, name)?;
+        } else {
+            ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
+        }
 
-    pub fn structure_attr(&mut self, attributes: impl Display, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
-        ind_ln!(self.indent, "{}", attributes)?;
-        self.structure(name)
+        Ok(Structure {
+            writer: self.writer.nest(),
+        })
     }
 }
 
@@ -127,8 +129,12 @@ mod tests {
         let mut buffer = vec![];
 
         {
-            let mut scope = Scope::new(Indent::new(&mut buffer));
-            let _structure = scope.structure_attr("#[repr(C)]", "Test");
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _structure = scope.structure(
+                Some("#[repr(C)]"),
+                Visibility::Private,
+                "Test"
+            );
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
