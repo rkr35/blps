@@ -1,6 +1,12 @@
 use std::fmt::{self, Display, Formatter};
 use std::io::{self, Write};
 
+macro_rules! ind {
+    ($writer:expr, $($arg:tt)*) => (
+        write!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
+    )   
+}
+
 macro_rules! ind_ln {
     ($writer:expr, $($arg:tt)*) => (
         writeln!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
@@ -129,11 +135,50 @@ impl<W: Write> Scope<W> {
     }
 
     pub fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
-        ind_ln!(self.writer, "{}fn {}() {{", vis, name)?;
+        self.function_args(vis, name, None::<(bool, bool)>)
+    }
+
+    pub fn function_args<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>) -> Result<Function<&mut W>, io::Error> {
+
+        ind!(self.writer, "{}fn {}(", vis, name)?;
+
+        for arg in args {
+            let arg = arg.into();
+            write!(self.writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+        }
+
+        ind_ln!(self.writer, ") {{")?;
 
         Ok(Function {
             writer: self.writer.nest(),
         })
+    }
+}
+
+pub struct Arg<N: Display, T: Display> {
+    name: N,
+    typ: T,
+}
+
+impl<N: Display, T: Display> From<(N, T)> for Arg<N, T> {
+    fn from((name, typ): (N, T)) -> Self {
+        Self { name, typ }
+    }
+}
+
+impl<D: Display> From<[D; 2]> for Arg<D, D> {
+    fn from([name, typ]: [D; 2]) -> Self {
+        Self { name, typ }
+    }
+}
+
+impl<N: Display, T: Display, U: Into<Arg<N, T>> + Copy> From<&U> for Arg<N, T> {
+    fn from(u: &U) -> Self {
+        (*u).into()
     }
 }
 
@@ -514,5 +559,21 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("fn_no_args_no_ret_public.expected"));
+    }
+
+    #[test]
+    fn fn_args_no_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
+
+            let _function = scope.function_args(Visibility::Private, "test", &args).unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_args_no_ret.expected"));
     }
 }
