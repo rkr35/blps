@@ -367,4 +367,25 @@ mod tests {
 
         assert_eq!(buffer, include_str!("enum_single_variant_annotate.expected"));
     }
+
+    #[test]
+    fn enum_multiple_variants() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let mut e = scope.enumeration(Visibility::Private, "TestEnum").unwrap();
+
+            e
+                .variant("TestVariant1").unwrap()
+                .variant("TestVariant2").unwrap()
+                .variant("TestVariant3").unwrap()
+                .variant("TestVariant4").unwrap()
+                ;
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("enum_multiple_variants.expected"));
+    }
 }
