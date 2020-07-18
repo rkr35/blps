@@ -123,8 +123,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let attrs: Option<&str> = None;
-            let _structure = scope.structure(attrs, Visibility::default(), "Test");
+            let _structure = scope.structure(None::<bool>, Visibility::default(), "Test");
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
@@ -138,7 +137,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let _structure = scope.structure(None::<&str>, Visibility::Public, "Test");
+            let _structure = scope.structure(None::<bool>, Visibility::Public, "Test");
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
