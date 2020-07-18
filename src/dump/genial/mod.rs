@@ -85,6 +85,13 @@ pub struct Structure<W: Write> {
     writer: Writer<W>,
 }
 
+impl<W: Write> Structure<W> {
+    pub fn field(&mut self, name: impl Display, typ: impl Display) -> Result<&mut Self, io::Error> {
+        ind_ln!(self.writer, "{}: {},", name, typ)?;
+        Ok(self)
+    }
+}
+
 impl<W: Write> Drop for Structure<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
@@ -173,5 +180,26 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("structure_repr_c_public.expected"));
+    }
+
+    #[test]
+    fn structure_single_field() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+
+            let mut structure = scope.structure(
+                None::<&str>,
+                Visibility::default(),
+                "Test"
+            ).unwrap();
+
+            structure.field("field1", "u32").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("structure_single_field.expected"));
     }
 }
