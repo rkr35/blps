@@ -501,4 +501,18 @@ mod tests {
 
         assert_eq!(buffer, include_str!("fn_no_args_no_ret.expected"));
     }
+
+    #[test]
+    fn fn_no_args_no_ret_public() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _function = scope.function(Visibility::Public, "test").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_no_args_no_ret_public.expected"));
+    }
 }
