@@ -126,6 +126,21 @@ mod tests {
     }
 
     #[test]
+    fn structure_empty_public() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let attrs: Option<&str> = None;
+            let _structure = scope.structure(attrs, Visibility::Public, "Test");
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, "pub struct Test {\n}\n");
+    }
+
+    #[test]
     fn structure_repr_c() {
         let mut buffer = vec![];
 
