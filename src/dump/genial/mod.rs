@@ -65,7 +65,7 @@ macro_rules! impl_writer_wrapper {
     }
 }
 
-impl_writer_wrapper!{ Scope Structure Enumeration }
+impl_writer_wrapper!{ Scope Structure Enumeration Impl }
 
 pub enum Visibility {
     Private,
@@ -448,5 +448,21 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("impl_trait_empty.expected"));
+    }
+
+    #[test]
+    fn impl_annotate() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let _imp = scope
+                .imp("Struct").unwrap()
+                .annotate("// I'm an annotation inside of an `impl` block.").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_annotate.expected"));
     }
 }
