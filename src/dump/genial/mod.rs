@@ -68,9 +68,9 @@ impl<W: Write> Scope<W> {
         Scope { writer }
     }
 
-    pub fn structure(&mut self, attrs: Option<impl Display>, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
-        if let Some(attrs) = attrs {
-            ind_ln!(self.writer, "{}\n{}struct {} {{", attrs, vis, name)?;
+    pub fn structure(&mut self, annotations: Option<impl Display>, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+        if let Some(annotations) = annotations {
+            ind_ln!(self.writer, "{}\n{}struct {} {{", annotations, vis, name)?;
         } else {
             ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
         }
