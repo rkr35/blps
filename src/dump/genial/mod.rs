@@ -333,4 +333,19 @@ mod tests {
 
         assert_eq!(buffer, include_str!("enum_single_variant.expected"));
     }
+
+    #[test]
+    fn enum_single_variant_public() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let mut e = scope.enumeration(Visibility::Public, "TestEnum").unwrap();
+            e.variant("TestVariant1").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("enum_single_variant_public.expected"));
+    }
 }
