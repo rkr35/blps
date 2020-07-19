@@ -75,6 +75,66 @@ pub trait WriterWrapper<W: Write> {
     }
 }
 
+pub trait GenFunction<W: Write>: WriterWrapper<W> {
+    fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
+        self.function_args(vis, name, None::<(bool, bool)>)
+    }
+
+    fn write_function_header(&mut self, vis: Visibility, name: impl Display) -> Result<(), io::Error> {
+        let writer = self.writer();
+        ind!(writer, "{}fn {}(", vis, name)?;
+        Ok(())
+    }
+
+    fn write_function_args<N: Display, T: Display>(&mut self,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>) -> Result<(), io::Error> {
+
+        let writer = self.writer();
+
+        for arg in args {
+            let arg = arg.into();
+            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+        }
+
+        Ok(())
+    }
+
+    fn function_args<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>)-> Result<Function<&mut W>, io::Error> {
+        
+        self.write_function_header(vis, name)?;
+        self.write_function_args(args)?;
+
+        let writer = self.writer();
+        writeln!(writer.writer, ") {{")?;
+
+        Ok(Function {
+            writer: writer.nest(),
+        })
+    }
+
+    fn function_args_ret<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
+        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
+
+        self.write_function_header(vis, name)?;
+        self.write_function_args(args)?;
+
+        let writer = self.writer();
+        writeln!(writer.writer, ") -> {} {{", ret)?;
+
+        Ok(Function {
+            writer: writer.nest(),
+        })
+    }
+}
+
 pub trait Gen<W: Write>: WriterWrapper<W> {
     fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
         let writer = self.writer();
@@ -111,53 +171,6 @@ pub trait Gen<W: Write>: WriterWrapper<W> {
             writer: self.writer().nest(),
         })
     }
-
-    fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
-        self.function_args(vis, name, None::<(bool, bool)>)
-    }
-
-    fn function_args<N: Display, T: Display>(
-        &mut self,
-        vis: Visibility,
-        name: impl Display,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>)-> Result<Function<&mut W>, io::Error> {
-        
-        let writer = self.writer();
-        ind!(writer, "{}fn {}(", vis, name)?;
-
-        for arg in args {
-            let arg = arg.into();
-            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
-        }
-
-        ind_ln!(writer, ") {{")?;
-
-        Ok(Function {
-            writer: self.writer().nest(),
-        })
-    }
-
-    fn function_args_ret<N: Display, T: Display>(
-        &mut self,
-        vis: Visibility,
-        name: impl Display,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
-        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
-
-        let writer = self.writer();
-        ind!(writer, "{}fn {}(", vis, name)?;
-
-        for arg in args {
-            let arg = arg.into();
-            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
-        }
-
-        ind_ln!(writer, ") -> {} {{", ret)?;
-
-        Ok(Function {
-            writer: self.writer().nest(),
-        })
-    }
 }
 
 macro_rules! impl_writer_wrapper {
@@ -174,12 +187,17 @@ macro_rules! impl_writer_wrapper {
 
 macro_rules! impl_gen {
     ($($structure:ident)+) => {
-        $(impl<W: Write> Gen<W> for $structure<W> {})+
+        $(
+            impl<W: Write> Gen<W> for $structure<W> {}
+            impl<W: Write> GenFunction<W> for $structure<W> {}
+        )+
     }
 }
 
 impl_writer_wrapper!{ Scope Structure Enumeration Impl Function IfBlock }
 impl_gen! { Scope Function IfBlock }
+
+impl<W: Write> GenFunction<W> for Impl<W> {}
 
 pub enum Visibility {
     Private,
@@ -611,6 +629,25 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("impl_line.expected"));
+    }
+
+    #[test]
+    fn impl_fn() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
+            let ret = "impl Iterator<Item = u8>";
+            scope
+                .imp("Struct").unwrap()
+                .function_args_ret(Visibility::Private, "test", &args, ret).unwrap()
+                .line("// Function implementation.").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_fn.expected"));
     }
 
     #[test]
