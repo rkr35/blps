@@ -157,6 +157,27 @@ impl<W: Write> Scope<W> {
             writer: self.writer.nest(),
         })
     }
+
+    pub fn function_args_ret<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
+        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
+
+        ind!(self.writer, "{}fn {}(", vis, name)?;
+
+        for arg in args {
+            let arg = arg.into();
+            write!(self.writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+        }
+
+        ind_ln!(self.writer, ") -> {} {{", ret)?;
+
+        Ok(Function {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 pub struct Arg<N: Display, T: Display> {
@@ -575,4 +596,21 @@ mod tests {
 
         assert_eq!(buffer, include_str!("fn_args_no_ret.expected"));
     }
+
+    #[test]
+    fn fn_args_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
+            let ret = "impl Iterator<Item = u8>";
+            let _function = scope.function_args_ret(Visibility::Private, "test", &args, ret).unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_args_ret.expected"));
+    }
+
 }
