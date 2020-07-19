@@ -49,15 +49,15 @@ pub trait WriterWrapper<W: Write> {
     fn writer(&mut self) -> &mut Writer<W>;
 }
 
-pub trait Annotate<W: Write> : WriterWrapper<W> {
-    fn annotate(&mut self, annotation: impl Display) -> Result<&mut Self, io::Error> {
+pub trait Line<W: Write> : WriterWrapper<W> {
+    fn line(&mut self, line: impl Display) -> Result<&mut Self, io::Error> {
         let writer = WriterWrapper::writer(self);
-        ind_ln!(writer, "{}", annotation)?;
+        ind_ln!(writer, "{}", line)?;
         Ok(self)
     }
 }
 
-impl<W: Write, V: WriterWrapper<W>> Annotate<W> for V {}
+impl<W: Write, V: WriterWrapper<W>> Line<W> for V {}
 
 macro_rules! impl_writer_wrapper {
     ($($structure:ident)+) => {
@@ -300,7 +300,7 @@ mod tests {
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let _structure = scope
-                .annotate("#[repr(C)]").unwrap()
+                .line("#[repr(C)]").unwrap()
                 .structure(Visibility::Private,"Test").unwrap();
         }
 
@@ -316,7 +316,7 @@ mod tests {
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let _structure = scope
-                .annotate("#[repr(C)]").unwrap()
+                .line("#[repr(C)]").unwrap()
                 .structure(Visibility::Public,"Test").unwrap();
         }
 
@@ -332,9 +332,9 @@ mod tests {
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let _structure = scope
-                .annotate("#[repr(C)]").unwrap()
-                .annotate("/// Second line").unwrap()
-                .annotate("/// Third line").unwrap()
+                .line("#[repr(C)]").unwrap()
+                .line("/// Second line").unwrap()
+                .line("/// Third line").unwrap()
                 .structure(Visibility::Private,"Test").unwrap();
         }
 
@@ -402,12 +402,12 @@ mod tests {
             ).unwrap();
 
             structure
-                .annotate("// 0x0(0x4)").unwrap()
+                .line("// 0x0(0x4)").unwrap()
                 .field("field1", "u32").unwrap()
-                .annotate("#[test(attr)]").unwrap()
+                .line("#[test(attr)]").unwrap()
                 .field("field2", "Option<(bool, f32, String, i128)>").unwrap()
-                .annotate("// Multi-").unwrap()
-                .annotate("// Line").unwrap()
+                .line("// Multi-").unwrap()
+                .line("// Line").unwrap()
                 .field("field3", format_args!("[{}; {}]", "u8", 32)).unwrap()
                 ;
         }
@@ -454,12 +454,12 @@ mod tests {
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let mut e = scope
-                .annotate("#[repr(u8)]").unwrap()
+                .line("#[repr(u8)]").unwrap()
                 .enumeration(Visibility::Private, "TestEnum").unwrap();
 
             e
-                .annotate("// Test annotation for first variant.").unwrap()
-                .annotate("#[test(attr)]").unwrap()
+                .line("// Test annotation for first variant.").unwrap()
+                .line("#[test(attr)]").unwrap()
                 .variant("TestVariant1").unwrap();
         }
 
@@ -518,19 +518,19 @@ mod tests {
     }
 
     #[test]
-    fn impl_annotate() {
+    fn impl_line() {
         let mut buffer = vec![];
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let _imp = scope
                 .imp("Struct").unwrap()
-                .annotate("// I'm an annotation inside of an `impl` block.").unwrap();
+                .line("// I'm a line inside of an `impl` block.").unwrap();
         }
 
         let buffer = str::from_utf8(&buffer).unwrap();
 
-        assert_eq!(buffer, include_str!("impl_annotate.expected"));
+        assert_eq!(buffer, include_str!("impl_line.expected"));
     }
 
     #[test]

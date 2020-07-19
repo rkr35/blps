@@ -1,3 +1,0 @@
-impl Struct {
-    // I'm an annotation inside of an `impl` block.
-}
