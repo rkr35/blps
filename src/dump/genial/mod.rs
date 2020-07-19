@@ -92,8 +92,10 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
         let writer = self.writer();
 
         for arg in args {
-            let arg = arg.into();
-            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+            match arg.into() {
+                Arg::Receiver(receiver) => write!(writer.writer, "{}, ", receiver)?,
+                Arg::NameType(name, typ) => write!(writer.writer, "{}: {}, ", name, typ)?,
+            }
         }
 
         Ok(())
@@ -229,20 +231,20 @@ impl<W: Write> Scope<W> {
     }
 }
 
-pub struct Arg<N: Display, T: Display> {
-    name: N,
-    typ: T,
+pub enum Arg<N: Display, T: Display> {
+    Receiver(&'static str),
+    NameType(N, T),
 }
 
 impl<N: Display, T: Display> From<(N, T)> for Arg<N, T> {
     fn from((name, typ): (N, T)) -> Self {
-        Self { name, typ }
+        Self::NameType(name, typ)
     }
 }
 
 impl<D: Display> From<[D; 2]> for Arg<D, D> {
     fn from([name, typ]: [D; 2]) -> Self {
-        Self { name, typ }
+        Self::NameType(name, typ)
     }
 }
 
@@ -348,6 +350,7 @@ impl<W: Write> Drop for IfBlock<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::iter;
     use std::str;
 
     #[test]
@@ -648,6 +651,26 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("impl_fn.expected"));
+    }
+
+    #[test]
+    fn impl_method_args_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
+            let args = iter::once(Arg::Receiver("&mut self")).chain(args.iter().map(Arg::from));
+            let ret = "impl Iterator<Item = u8>";
+            scope
+                .imp("Struct").unwrap()
+                .function_args_ret(Visibility::Private, "test", args, ret).unwrap()
+                .line("// Function implementation.").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_method_args_ret.expected"));
     }
 
     #[test]
