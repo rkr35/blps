@@ -77,7 +77,7 @@ pub trait WriterWrapper<W: Write> {
 
 pub trait GenFunction<W: Write>: WriterWrapper<W> {
     fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
-        self.function_args(vis, name, None::<(bool, bool)>)
+        self.function_args(vis, name, None::<(Nil, Nil)>)
     }
 
     fn write_function_header(&mut self, vis: Visibility, name: impl Display) -> Result<(), io::Error> {
@@ -344,6 +344,14 @@ impl<W: Write> Drop for IfBlock<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
+    }
+}
+
+pub struct Nil;
+
+impl Display for Nil {
+    fn fmt(&self, _: &mut Formatter) -> Result<(), fmt::Error> {
+        Ok(())
     }
 }
 
@@ -661,7 +669,7 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             scope
                 .imp("Struct").unwrap()
-                .function_args(Visibility::Private, "test", iter::once(Arg::<bool, bool>::Receiver("&mut self"))).unwrap()
+                .function_args(Visibility::Private, "test", iter::once(Arg::<Nil, Nil>::Receiver("&mut self"))).unwrap()
                 .line("// Function implementation.").unwrap();
         }
 
