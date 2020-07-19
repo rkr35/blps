@@ -231,6 +231,16 @@ impl<W: Write> Scope<W> {
     }
 }
 
+macro_rules! args {
+    ($receiver:literal) => {{
+        std::iter::once(Arg::<Nil, Nil>::Receiver($receiver))
+    }};
+
+    ($receiver:literal, $args:expr) => {{
+        std::iter::once(Arg::Receiver($receiver)).chain($args.map(Arg::from))
+    }};
+}
+
 pub enum Arg<N: Display, T: Display> {
     Receiver(&'static str),
     NameType(N, T),
@@ -358,7 +368,6 @@ impl Display for Nil {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::iter;
     use std::str;
 
     #[test]
@@ -669,7 +678,7 @@ mod tests {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             scope
                 .imp("Struct").unwrap()
-                .function_args(Visibility::Private, "test", iter::once(Arg::<Nil, Nil>::Receiver("&mut self"))).unwrap()
+                .function_args(Visibility::Private, "test", args!("&mut self")).unwrap()
                 .line("// Function implementation.").unwrap();
         }
 
@@ -684,8 +693,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
-            let args = iter::once(Arg::Receiver("&mut self")).chain(args.iter().map(Arg::from));
+            let args = args!("&mut self", [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]].iter());
             scope
                 .imp("Struct").unwrap()
                 .function_args(Visibility::Private, "test", args).unwrap()
@@ -703,8 +711,7 @@ mod tests {
 
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
-            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
-            let args = iter::once(Arg::Receiver("&mut self")).chain(args.iter().map(Arg::from));
+            let args = args!("&mut self", [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]].iter());
             let ret = "impl Iterator<Item = u8>";
             scope
                 .imp("Struct").unwrap()
