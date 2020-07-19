@@ -71,7 +71,7 @@ macro_rules! impl_writer_wrapper {
     }
 }
 
-impl_writer_wrapper!{ Scope Structure Enumeration Impl }
+impl_writer_wrapper!{ Scope Structure Enumeration Impl Function }
 
 pub enum Visibility {
     Private,
@@ -613,4 +613,19 @@ mod tests {
         assert_eq!(buffer, include_str!("fn_args_ret.expected"));
     }
 
+    #[test]
+    fn fn_single_line_body() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            scope
+                .function(Visibility::Private, "test").unwrap()
+                .line("let x = 2 - 3 + 5 - 7 + 11 - 13;").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_single_line_body.expected"));
+    }
 }
