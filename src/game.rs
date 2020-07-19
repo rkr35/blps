@@ -198,10 +198,9 @@ impl DerefMut for Struct {
 
 impl Struct {
     pub unsafe fn iter_children(&self) -> impl Iterator<Item = &Property> {
-        iter::successors(
-            self.children.cast::<Property>().as_ref(),
-            |property| property.next.cast::<Property>().as_ref(),
-        )
+        iter::successors(self.children.cast::<Property>().as_ref(), |property| {
+            property.next.cast::<Property>().as_ref()
+        })
     }
 }
 
@@ -383,7 +382,7 @@ impl Property {
         const RETURN_PARAM: u32 = 0x400;
         self.property_flags_0 & RETURN_PARAM == RETURN_PARAM
     }
-    
+
     pub fn is_out_param(&self) -> bool {
         const OUT_PARAM: u32 = 0x100;
         self.property_flags_0 & OUT_PARAM == OUT_PARAM
@@ -392,7 +391,7 @@ impl Property {
     pub fn is_param(&self) -> bool {
         const PARAM: u32 = 0x80;
         self.property_flags_0 & PARAM == PARAM
-    }    
+    }
 }
 
 #[repr(C)]

@@ -4,13 +4,13 @@ use std::io::{self, Write};
 macro_rules! ind {
     ($writer:expr, $($arg:tt)*) => (
         write!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
-    )   
+    )
 }
 
 macro_rules! ind_ln {
     ($writer:expr, $($arg:tt)*) => (
         writeln!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
-    )   
+    )
 }
 
 pub struct Writer<W: Write> {
@@ -46,16 +46,13 @@ impl<W: Write> Writer<W> {
 
 impl<W: Write> From<W> for Writer<W> {
     fn from(writer: W) -> Self {
-        Self {
-            writer,
-            indent: 0
-        }
+        Self { writer, indent: 0 }
     }
 }
 
 pub trait WriterWrapper<W: Write> {
     fn writer(&mut self) -> &mut Writer<W>;
-    
+
     fn line(&mut self, line: impl Display) -> Result<&mut Self, io::Error> {
         let writer = self.writer();
         ind_ln!(writer, "{}", line)?;
@@ -76,19 +73,28 @@ pub trait WriterWrapper<W: Write> {
 }
 
 pub trait GenFunction<W: Write>: WriterWrapper<W> {
-    fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
+    fn function(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+    ) -> Result<Function<&mut W>, io::Error> {
         self.function_args(vis, name, None::<(Nil, Nil)>)
     }
 
-    fn write_function_header(&mut self, vis: Visibility, name: impl Display) -> Result<(), io::Error> {
+    fn write_function_header(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+    ) -> Result<(), io::Error> {
         let writer = self.writer();
         ind!(writer, "{}fn {}(", vis, name)?;
         Ok(())
     }
 
-    fn write_function_args<N: Display, T: Display>(&mut self,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>) -> Result<(), io::Error> {
-
+    fn write_function_args<N: Display, T: Display>(
+        &mut self,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
+    ) -> Result<(), io::Error> {
         let writer = self.writer();
 
         for arg in args {
@@ -105,8 +111,8 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
         &mut self,
         vis: Visibility,
         name: impl Display,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>)-> Result<Function<&mut W>, io::Error> {
-        
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
+    ) -> Result<Function<&mut W>, io::Error> {
         self.write_function_header(vis, name)?;
         self.write_function_args(args)?;
 
@@ -123,8 +129,8 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
         vis: Visibility,
         name: impl Display,
         args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
-        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
-
+        ret: impl Display,
+    ) -> Result<Function<&mut W>, io::Error> {
         self.write_function_header(vis, name)?;
         self.write_function_args(args)?;
 
@@ -138,7 +144,11 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
 }
 
 pub trait Gen<W: Write>: WriterWrapper<W> {
-    fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+    fn structure(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+    ) -> Result<Structure<&mut W>, io::Error> {
         let writer = self.writer();
         ind_ln!(writer, "{}struct {} {{", vis, name)?;
 
@@ -147,7 +157,11 @@ pub trait Gen<W: Write>: WriterWrapper<W> {
         })
     }
 
-    fn enumeration(&mut self, vis: Visibility, name: impl Display) -> Result<Enumeration<&mut W>, io::Error> {
+    fn enumeration(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+    ) -> Result<Enumeration<&mut W>, io::Error> {
         let writer = self.writer();
         ind_ln!(writer, "{}enum {} {{", vis, name)?;
 
@@ -165,7 +179,11 @@ pub trait Gen<W: Write>: WriterWrapper<W> {
         })
     }
 
-    fn imp_trait(&mut self, r#trait: impl Display, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
+    fn imp_trait(
+        &mut self,
+        r#trait: impl Display,
+        target: impl Display,
+    ) -> Result<Impl<&mut W>, io::Error> {
         let writer = self.writer();
         ind_ln!(writer, "impl {} for {} {{", r#trait, target)?;
 
@@ -196,7 +214,7 @@ macro_rules! impl_gen {
     }
 }
 
-impl_writer_wrapper!{ Scope Structure Enumeration Impl Function IfBlock }
+impl_writer_wrapper! { Scope Structure Enumeration Impl Function IfBlock }
 impl_gen! { Scope Function IfBlock }
 
 impl<W: Write> GenFunction<W> for Impl<W> {}
@@ -304,9 +322,7 @@ pub struct Impl<W: Write> {
     writer: Writer<W>,
 }
 
-impl<W: Write> Impl<W> {
-
-}
+impl<W: Write> Impl<W> {}
 
 impl<W: Write> Drop for Impl<W> {
     fn drop(&mut self) {

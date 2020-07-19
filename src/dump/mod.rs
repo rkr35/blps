@@ -382,8 +382,9 @@ unsafe fn add_fields(
         let info = PropertyInfo::try_from(property)?;
 
         let total_property_size = property.element_size * property.array_dim;
-        
-        let size_mismatch = i64::from(total_property_size) - i64::from(info.size * property.array_dim);
+
+        let size_mismatch =
+            i64::from(total_property_size) - i64::from(info.size * property.array_dim);
 
         if size_mismatch != 0 {
             return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
@@ -403,10 +404,7 @@ unsafe fn add_fields(
 
         let field_name = format!(
             "pub {}",
-            get_unique_name(
-                &mut field_name_counts,
-                scrub_reserved_name(name)
-            )
+            get_unique_name(&mut field_name_counts, scrub_reserved_name(name))
         );
 
         let mut field_type = info.into_typed_comment();
@@ -474,7 +472,7 @@ fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
         .line("&mut self.base");
 }
 
-/// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) -> 
+/// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) ->
 /// `&[mut] game::Object` (handwritten with helpful impls)
 fn add_object_deref_impl(sdk: &mut Scope) {
     sdk.new_impl("Object")
@@ -538,50 +536,57 @@ struct Parameters<'a>(Vec<Parameter<'a>>);
 impl<'a> TryFrom<&'a Function> for Parameters<'a> {
     type Error = Error;
 
-    fn try_from(method: &Function) -> Result<Parameters, Self::Error> { unsafe {
-        let parameters = method
-            .iter_children()
-            .filter(|p| p.element_size > 0);
+    fn try_from(method: &Function) -> Result<Parameters, Self::Error> {
+        unsafe {
+            let parameters = method.iter_children().filter(|p| p.element_size > 0);
 
-        let mut ret = Parameters::default();
+            let mut ret = Parameters::default();
 
-        let mut parameter_name_counts = HashMap::new();
+            let mut parameter_name_counts = HashMap::new();
 
-        for parameter in parameters {
-            let kind = if parameter.is_out_param() || parameter.is_return_param() {
-                ParameterKind::Output
-            } else if parameter.is_param() {
-                ParameterKind::Input
-            } else {
-                continue;
-            };
+            for parameter in parameters {
+                let kind = if parameter.is_out_param() || parameter.is_return_param() {
+                    ParameterKind::Output
+                } else if parameter.is_param() {
+                    ParameterKind::Input
+                } else {
+                    continue;
+                };
 
-            let name = helper::get_name(parameter as &Object)?;
-            let name = scrub_reserved_name(name);
-            let name = get_unique_name(&mut parameter_name_counts, name);
-            let mut typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
+                let name = helper::get_name(parameter as &Object)?;
+                let name = scrub_reserved_name(name);
+                let name = get_unique_name(&mut parameter_name_counts, name);
+                let mut typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
 
-            if typ == "u32" {
-                // Special case: Apparently `BoolProperty` is "u32" in
-                // structure/class definitions, but "bool" when in method
-                // parameters.
-                typ = "bool".into();
+                if typ == "u32" {
+                    // Special case: Apparently `BoolProperty` is "u32" in
+                    // structure/class definitions, but "bool" when in method
+                    // parameters.
+                    typ = "bool".into();
+                }
+
+                ret.0.push(Parameter {
+                    property: parameter,
+                    kind,
+                    name,
+                    typ,
+                });
             }
 
-            ret.0.push(Parameter { property: parameter, kind, name, typ });
+            ret.0
+                .sort_by(|p, q| property_compare(p.property, q.property));
+
+            Ok(ret)
         }
-
-        ret.0.sort_by(|p, q| property_compare(p.property, q.property));
-
-        Ok(ret)
-    }}
+    }
 }
 
-unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str, u8>, method: &Function) -> Result<(), Error> {
-    let name = get_unique_name(
-        method_name_counts,
-        helper::get_name(method as &Object)?
-    );
+unsafe fn add_method(
+    impl_gen: &mut Impl,
+    method_name_counts: &mut HashMap<&str, u8>,
+    method: &Function,
+) -> Result<(), Error> {
+    let name = get_unique_name(method_name_counts, helper::get_name(method as &Object)?);
 
     let method_gen = impl_gen
         .new_fn(&name)
@@ -590,7 +595,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
         .arg_mut_self();
 
     let parameters = Parameters::try_from(method)?;
-    
+
     let mut structure = Block::new("#[repr(C)]\nstruct Parameters");
     let mut structure_init = Block::new("let mut p = Parameters");
     let mut return_tuple = vec![];
@@ -605,7 +610,10 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
             }
 
             ParameterKind::Output => {
-                structure.line(format!("{}: MaybeUninit<{}>,", parameter.name, parameter.typ));
+                structure.line(format!(
+                    "{}: MaybeUninit<{}>,",
+                    parameter.name, parameter.typ
+                ));
                 structure_init.line(format!("{}: MaybeUninit::uninit(),", parameter.name));
                 return_tuple.push((format!("p.{}.assume_init()", parameter.name), parameter.typ));
             }
@@ -613,13 +621,13 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     }
 
     let mut if_block = Block::new("if let Some(function) = FUNCTION");
-    
+
     structure.after("\n");
     if_block.push_block(structure);
 
     structure_init.after(";\n");
     if_block.push_block(structure_init);
-    
+
     if_block.line("let old_flags = (*function).flags;");
 
     if method.is_native() {
@@ -641,25 +649,25 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
         _ => {
             let mut idents = String::from("\nSome((");
             let mut ret = String::from("Option<(");
-        
+
             for (ident, typ) in &return_tuple {
                 idents.push_str(ident);
                 idents.push_str(", ");
-        
+
                 ret.push_str(typ);
                 ret.push_str(", ");
             }
-        
+
             // Remove trailing ", "
             idents.pop();
             idents.pop();
-        
+
             ret.pop();
             ret.pop();
-        
+
             idents.push_str("))");
             ret.push_str(")>");
-        
+
             if_block.line(idents);
             method_gen.ret(ret);
         }
@@ -668,7 +676,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     if_block.after(" else");
 
     let mut else_block = Block::new("");
-    
+
     else_block.line(format!(
         "FUNCTION = (*GLOBAL_OBJECTS).find_mut(\"{}\").map(|o| o.cast());",
         helper::get_full_name(method as &Object)?
@@ -677,7 +685,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
     if !return_tuple.is_empty() {
         else_block.line("None");
     }
-    
+
     method_gen.push_block(if_block);
     method_gen.push_block(else_block);
 
@@ -685,10 +693,7 @@ unsafe fn add_method(impl_gen: &mut Impl, method_name_counts: &mut HashMap<&str,
 }
 
 fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
-    let count = *name_counts
-        .entry(name)
-        .and_modify(|c| *c += 1)
-        .or_default();
+    let count = *name_counts.entry(name).and_modify(|c| *c += 1).or_default();
 
     if count == 0 {
         Cow::Borrowed(name)
