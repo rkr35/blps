@@ -1,0 +1,5 @@
+impl Struct {
+    fn test(&mut self, arg1: typ1, arg2: typ2, arg3: typ3, ) {
+        // Function implementation.
+    }
+}

@@ -669,6 +669,26 @@ mod tests {
 
         assert_eq!(buffer, include_str!("impl_method_no_args_no_ret.expected"));
     }
+
+    #[test]
+    fn impl_method_args_no_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
+            let args = iter::once(Arg::Receiver("&mut self")).chain(args.iter().map(Arg::from));
+            scope
+                .imp("Struct").unwrap()
+                .function_args(Visibility::Private, "test", args).unwrap()
+                .line("// Function implementation.").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_method_args_no_ret.expected"));
+    }
+
     #[test]
     fn impl_method_args_ret() {
         let mut buffer = vec![];
