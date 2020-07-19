@@ -654,6 +654,22 @@ mod tests {
     }
 
     #[test]
+    fn impl_method_no_args_no_ret() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            scope
+                .imp("Struct").unwrap()
+                .function_args(Visibility::Private, "test", iter::once(Arg::<bool, bool>::Receiver("&mut self"))).unwrap()
+                .line("// Function implementation.").unwrap();
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("impl_method_no_args_no_ret.expected"));
+    }
+    #[test]
     fn impl_method_args_ret() {
         let mut buffer = vec![];
 
