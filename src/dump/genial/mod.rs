@@ -568,7 +568,6 @@ mod tests {
         {
             let mut scope = Scope::new(Writer::from(&mut buffer));
             let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
-
             let _function = scope.function_args(Visibility::Private, "test", &args).unwrap();
         }
 
