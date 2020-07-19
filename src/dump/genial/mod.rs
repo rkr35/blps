@@ -216,7 +216,7 @@ impl Display for Visibility {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::Private => Ok(()),
-            Self::Public => write!(f, "pub "),
+            Self::Public => "pub ".fmt(f),
         }
     }
 }
