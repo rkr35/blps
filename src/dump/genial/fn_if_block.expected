@@ -1,0 +1,5 @@
+fn test() {
+    if let Some(function) = FUNCTION {
+        // If block.
+    }
+}

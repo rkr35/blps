@@ -47,17 +47,110 @@ impl<W: Write> From<W> for Writer<W> {
 
 pub trait WriterWrapper<W: Write> {
     fn writer(&mut self) -> &mut Writer<W>;
-}
-
-pub trait Line<W: Write> : WriterWrapper<W> {
+    
     fn line(&mut self, line: impl Display) -> Result<&mut Self, io::Error> {
-        let writer = WriterWrapper::writer(self);
+        let writer = self.writer();
         ind_ln!(writer, "{}", line)?;
+        Ok(self)
+    }
+
+    fn put(&mut self, put: impl Display) -> Result<&mut Self, io::Error> {
+        let writer = self.writer();
+        ind!(writer, "{}", put)?;
+        Ok(self)
+    }
+
+    fn raw(&mut self, raw: impl Display) -> Result<&mut Self, io::Error> {
+        let writer = self.writer();
+        write!(writer.writer, "{}", raw)?;
         Ok(self)
     }
 }
 
-impl<W: Write, V: WriterWrapper<W>> Line<W> for V {}
+pub trait Gen<W: Write>: WriterWrapper<W> {
+    fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
+        let writer = self.writer();
+        ind_ln!(writer, "{}struct {} {{", vis, name)?;
+
+        Ok(Structure {
+            writer: self.writer().nest(),
+        })
+    }
+
+    fn enumeration(&mut self, vis: Visibility, name: impl Display) -> Result<Enumeration<&mut W>, io::Error> {
+        let writer = self.writer();
+        ind_ln!(writer, "{}enum {} {{", vis, name)?;
+
+        Ok(Enumeration {
+            writer: self.writer().nest(),
+        })
+    }
+
+    fn imp(&mut self, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
+        let writer = self.writer();
+        ind_ln!(writer, "impl {} {{", target)?;
+
+        Ok(Impl {
+            writer: self.writer().nest(),
+        })
+    }
+
+    fn imp_trait(&mut self, r#trait: impl Display, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
+        let writer = self.writer();
+        ind_ln!(writer, "impl {} for {} {{", r#trait, target)?;
+
+        Ok(Impl {
+            writer: self.writer().nest(),
+        })
+    }
+
+    fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
+        self.function_args(vis, name, None::<(bool, bool)>)
+    }
+
+    fn function_args<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>)-> Result<Function<&mut W>, io::Error> {
+        
+        let writer = self.writer();
+        ind!(writer, "{}fn {}(", vis, name)?;
+
+        for arg in args {
+            let arg = arg.into();
+            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+        }
+
+        ind_ln!(writer, ") {{")?;
+
+        Ok(Function {
+            writer: self.writer().nest(),
+        })
+    }
+
+    fn function_args_ret<N: Display, T: Display>(
+        &mut self,
+        vis: Visibility,
+        name: impl Display,
+        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
+        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
+
+        let writer = self.writer();
+        ind!(writer, "{}fn {}(", vis, name)?;
+
+        for arg in args {
+            let arg = arg.into();
+            write!(writer.writer, "{}: {}, ", arg.name, arg.typ)?;
+        }
+
+        ind_ln!(writer, ") -> {} {{", ret)?;
+
+        Ok(Function {
+            writer: self.writer().nest(),
+        })
+    }
+}
 
 macro_rules! impl_writer_wrapper {
     ($($structure:ident)+) => {
@@ -71,7 +164,14 @@ macro_rules! impl_writer_wrapper {
     }
 }
 
-impl_writer_wrapper!{ Scope Structure Enumeration Impl Function }
+macro_rules! impl_gen {
+    ($($structure:ident)+) => {
+        $(impl<W: Write> Gen<W> for $structure<W> {})+
+    }
+}
+
+impl_writer_wrapper!{ Scope Structure Enumeration Impl Function IfBlock }
+impl_gen! { Scope Function IfBlock }
 
 pub enum Visibility {
     Private,
@@ -100,83 +200,6 @@ pub struct Scope<W: Write> {
 impl<W: Write> Scope<W> {
     pub fn new(writer: Writer<W>) -> Scope<W> {
         Scope { writer }
-    }
-
-    pub fn structure(&mut self, vis: Visibility, name: impl Display) -> Result<Structure<&mut W>, io::Error> {
-        ind_ln!(self.writer, "{}struct {} {{", vis, name)?;
-
-        Ok(Structure {
-            writer: self.writer.nest(),
-        })
-    }
-
-    pub fn enumeration(&mut self, vis: Visibility, name: impl Display) -> Result<Enumeration<&mut W>, io::Error> {
-        ind_ln!(self.writer, "{}enum {} {{", vis, name)?;
-
-        Ok(Enumeration {
-            writer: self.writer.nest(),
-        })
-    }
-
-    pub fn imp(&mut self, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
-        ind_ln!(self.writer, "impl {} {{", target)?;
-
-        Ok(Impl {
-            writer: self.writer.nest(),
-        })
-    }
-
-    pub fn imp_trait(&mut self, r#trait: impl Display, target: impl Display) -> Result<Impl<&mut W>, io::Error> {
-        ind_ln!(self.writer, "impl {} for {} {{", r#trait, target)?;
-
-        Ok(Impl {
-            writer: self.writer.nest(),
-        })
-    }
-
-    pub fn function(&mut self, vis: Visibility, name: impl Display) -> Result<Function<&mut W>, io::Error> {
-        self.function_args(vis, name, None::<(bool, bool)>)
-    }
-
-    pub fn function_args<N: Display, T: Display>(
-        &mut self,
-        vis: Visibility,
-        name: impl Display,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>) -> Result<Function<&mut W>, io::Error> {
-
-        ind!(self.writer, "{}fn {}(", vis, name)?;
-
-        for arg in args {
-            let arg = arg.into();
-            write!(self.writer.writer, "{}: {}, ", arg.name, arg.typ)?;
-        }
-
-        ind_ln!(self.writer, ") {{")?;
-
-        Ok(Function {
-            writer: self.writer.nest(),
-        })
-    }
-
-    pub fn function_args_ret<N: Display, T: Display>(
-        &mut self,
-        vis: Visibility,
-        name: impl Display,
-        args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
-        ret: impl Display) -> Result<Function<&mut W>, io::Error> {
-
-        ind!(self.writer, "{}fn {}(", vis, name)?;
-
-        for arg in args {
-            let arg = arg.into();
-            write!(self.writer.writer, "{}: {}, ", arg.name, arg.typ)?;
-        }
-
-        ind_ln!(self.writer, ") -> {} {{", ret)?;
-
-        Ok(Function {
-            writer: self.writer.nest(),
-        })
     }
 }
 
@@ -259,9 +282,30 @@ pub struct Function<W: Write> {
 }
 
 impl<W: Write> Function<W> {
+    pub fn if_block(&mut self, r#if: impl Display) -> Result<IfBlock<&mut W>, io::Error> {
+        ind_ln!(self.writer, "{} {{", r#if)?;
+
+        Ok(IfBlock {
+            writer: self.writer.nest(),
+        })
+    }
 }
 
 impl<W: Write> Drop for Function<W> {
+    fn drop(&mut self) {
+        let indent = self.writer.unnest();
+        ind_ln!(indent, "}}").unwrap();
+    }
+}
+
+pub struct IfBlock<W: Write> {
+    writer: Writer<W>,
+}
+
+impl<W: Write> IfBlock<W> {
+}
+
+impl<W: Write> Drop for IfBlock<W> {
     fn drop(&mut self) {
         let indent = self.writer.unnest();
         ind_ln!(indent, "}}").unwrap();
@@ -627,5 +671,23 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("fn_single_line_body.expected"));
+    }
+
+    #[test]
+    fn fn_if_block() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            scope
+                .function(Visibility::Private, "test").unwrap()
+                .if_block("if let Some(function) = FUNCTION").unwrap()
+                .line("// If block.").unwrap()
+                ;
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_if_block.expected"));
     }
 }
