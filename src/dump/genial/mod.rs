@@ -34,6 +34,14 @@ impl<W: Write> Writer<W> {
             indent: self.indent - Self::INDENT,
         }
     }
+
+    pub fn indent(&mut self) {
+        self.indent += Self::INDENT;
+    }
+
+    pub fn undent(&mut self) {
+        self.indent -= Self::INDENT;
+    }
 }
 
 impl<W: Write> From<W> for Writer<W> {
@@ -303,6 +311,13 @@ pub struct IfBlock<W: Write> {
 }
 
 impl<W: Write> IfBlock<W> {
+    pub fn else_block(&mut self, r#else: impl Display) -> Result<&mut Self, io::Error> {
+        self.writer.undent();
+        ind_ln!(self.writer, "}} {} {{", r#else)?;
+        self.writer.indent();
+
+        Ok(self)
+    }
 }
 
 impl<W: Write> Drop for IfBlock<W> {
@@ -689,5 +704,25 @@ mod tests {
         let buffer = str::from_utf8(&buffer).unwrap();
 
         assert_eq!(buffer, include_str!("fn_if_block.expected"));
+    }
+
+    #[test]
+    fn fn_else_block() {
+        let mut buffer = vec![];
+
+        {
+            let mut scope = Scope::new(Writer::from(&mut buffer));
+            scope
+                .function(Visibility::Private, "test").unwrap()
+                .if_block("if let Some(function) = FUNCTION").unwrap()
+                .line("// If block.").unwrap()
+                .else_block("else").unwrap()
+                .line("// Else block.").unwrap()
+                ;
+        }
+
+        let buffer = str::from_utf8(&buffer).unwrap();
+
+        assert_eq!(buffer, include_str!("fn_else_block.expected"));
     }
 }
