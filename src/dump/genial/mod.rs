@@ -29,13 +29,6 @@ impl<W: Write> Writer<W> {
         }
     }
 
-    pub fn unnest(&mut self) -> Writer<&mut W> {
-        Writer {
-            writer: &mut self.writer,
-            indent: self.indent - Self::INDENT,
-        }
-    }
-
     pub fn indent(&mut self) {
         self.indent += Self::INDENT;
     }
@@ -215,8 +208,22 @@ macro_rules! impl_gen {
     }
 }
 
+macro_rules! impl_closing_brace_drop {
+    ($($structure:ident)+) => {
+        $(
+            impl<W: Write> Drop for $structure<W> {
+                fn drop(&mut self) {
+                    self.writer.undent();
+                    ind_ln!(self.writer, "}}").unwrap();
+                }
+            }
+        )+
+    }
+}
+
 impl_writer_wrapper! { Scope Structure Enumeration Impl Function IfBlock }
 impl_gen! { Scope Function IfBlock }
+impl_closing_brace_drop! { Structure Enumeration Impl Function IfBlock }
 
 impl<W: Write> GenFunction<W> for Impl<W> {}
 
@@ -294,13 +301,6 @@ impl<W: Write> Structure<W> {
     }
 }
 
-impl<W: Write> Drop for Structure<W> {
-    fn drop(&mut self) {
-        let indent = self.writer.unnest();
-        ind_ln!(indent, "}}").unwrap();
-    }
-}
-
 pub struct Enumeration<W: Write> {
     writer: Writer<W>,
 }
@@ -312,25 +312,11 @@ impl<W: Write> Enumeration<W> {
     }
 }
 
-impl<W: Write> Drop for Enumeration<W> {
-    fn drop(&mut self) {
-        let indent = self.writer.unnest();
-        ind_ln!(indent, "}}").unwrap();
-    }
-}
-
 pub struct Impl<W: Write> {
     writer: Writer<W>,
 }
 
 impl<W: Write> Impl<W> {}
-
-impl<W: Write> Drop for Impl<W> {
-    fn drop(&mut self) {
-        let indent = self.writer.unnest();
-        ind_ln!(indent, "}}").unwrap();
-    }
-}
 
 pub struct Function<W: Write> {
     writer: Writer<W>,
@@ -346,13 +332,6 @@ impl<W: Write> Function<W> {
     }
 }
 
-impl<W: Write> Drop for Function<W> {
-    fn drop(&mut self) {
-        let indent = self.writer.unnest();
-        ind_ln!(indent, "}}").unwrap();
-    }
-}
-
 pub struct IfBlock<W: Write> {
     writer: Writer<W>,
 }
@@ -364,13 +343,6 @@ impl<W: Write> IfBlock<W> {
         self.writer.indent();
 
         Ok(self)
-    }
-}
-
-impl<W: Write> Drop for IfBlock<W> {
-    fn drop(&mut self) {
-        let indent = self.writer.unnest();
-        ind_ln!(indent, "}}").unwrap();
     }
 }
 
