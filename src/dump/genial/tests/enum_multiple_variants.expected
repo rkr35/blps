@@ -4,3 +4,4 @@ enum TestEnum {
     TestVariant3,
     TestVariant4,
 }
+

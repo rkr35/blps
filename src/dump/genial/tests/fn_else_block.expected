@@ -4,4 +4,6 @@ fn test() {
     } else {
         // Else block.
     }
+
 }
+

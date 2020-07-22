@@ -214,7 +214,7 @@ macro_rules! impl_closing_brace_drop {
             impl<W: Write> Drop for $structure<W> {
                 fn drop(&mut self) {
                     self.writer.undent();
-                    ind_ln!(self.writer, "}}").unwrap();
+                    ind_ln!(self.writer, "}}\n").unwrap();
                 }
             }
         )+

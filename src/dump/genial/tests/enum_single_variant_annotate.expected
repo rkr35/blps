@@ -4,3 +4,4 @@ enum TestEnum {
     #[test(attr)]
     TestVariant1,
 }
+

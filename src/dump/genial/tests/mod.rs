@@ -28,7 +28,7 @@ fn structure_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, "struct Test {\n}\n");
+    assert_eq!(buffer, "struct Test {\n}\n\n");
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn structure_empty_public() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, "pub struct Test {\n}\n");
+    assert_eq!(buffer, "pub struct Test {\n}\n\n");
 }
 
 #[test]

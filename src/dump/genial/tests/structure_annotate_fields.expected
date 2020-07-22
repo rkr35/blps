@@ -7,3 +7,4 @@ struct Test {
     // Line
     field3: [u8; 32],
 }
+
