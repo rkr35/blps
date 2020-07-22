@@ -2,15 +2,16 @@ use std::fmt::{self, Display, Formatter};
 use std::io::{self, Write};
 
 macro_rules! ind {
-    ($writer:expr, $($arg:tt)*) => (
-        write!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
-    )
+    ($writer:expr, $fmt:expr, $($arg:tt),*) => (
+        write!($writer.writer, concat!("{:indent$}", $fmt), "", $($arg,)* indent=$writer.indent)
+    );
+
+    ($writer:expr, $fmt:expr) => (ind!($writer, $fmt,));
 }
 
 macro_rules! ind_ln {
-    ($writer:expr, $($arg:tt)*) => (
-        writeln!($writer.writer, "{:indent$}{rest}", "", indent=$writer.indent, rest=format_args!($($arg)*))
-    )
+    ($writer:expr, $fmt:expr, $($arg:tt)*) => (ind!($writer, concat!($fmt, "\n"), $($arg)*));
+    ($writer:expr, $fmt:expr) => (ind_ln!($writer, $fmt,));
 }
 
 pub struct Writer<W: Write> {
