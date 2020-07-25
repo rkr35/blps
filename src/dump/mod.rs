@@ -23,7 +23,7 @@ use bitfield::{Bitfields, PostAddInstruction};
 mod genial;
 
 #[cfg(feature = "genial")]
-use genial::{Scope, Writer, WriterWrapper};
+use genial::{Gen, Scope, Visibility, Writer, WriterWrapper};
 
 mod helper;
 
@@ -163,9 +163,9 @@ fn add_imports<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
 unsafe fn write_object(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     if (*object).is(CONSTANT) {
         write_constant(sdk, object)?;
-    }/* else if (*object).is(ENUMERATION) {
+    } else if (*object).is(ENUMERATION) {
         write_enumeration(sdk, object)?;
-    } else if (*object).is(STRUCTURE) {
+    }/* else if (*object).is(STRUCTURE) {
         write_structure(sdk, object)?;
     } else if (*object).is(CLASS) {
         write_class(sdk, object)?;
@@ -205,8 +205,7 @@ unsafe fn write_constant(sdk: &mut Scope<impl Write>, object: *const Object) -> 
     Ok(())
 }
 
-/*
-unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+unsafe fn write_enumeration(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     impl Enum {
         pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
             self.variants.iter().map(|n| n.name())
@@ -258,7 +257,9 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
 
     let name = helper::resolve_duplicate(object.cast())?;
 
-    let enum_gen = sdk.new_enum(&name).repr("u8").vis("pub");
+    let mut enum_gen = sdk
+        .line("#[repr(u8)]")?
+        .enumeration(Visibility::Public, &name)?;
 
     for variant in variants {
         // Use the unstripped prefix form of the variant if the stripped form
@@ -281,12 +282,23 @@ unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<()
             })
             .to_camel_case();
 
-        enum_gen.new_variant(&variant);
+        enum_gen.variant(variant)?;
     }
 
     Ok(())
 }
 
+fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
+    let count = *name_counts.entry(name).and_modify(|c| *c += 1).or_default();
+
+    if count == 0 {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(format!("{}_{}", name, count))
+    }
+}
+
+/*
 unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     let name = helper::resolve_duplicate(object)?;
 
@@ -694,15 +706,5 @@ unsafe fn add_method(
     method_gen.push_block(else_block);
 
     Ok(())
-}
-
-fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) -> Cow<'a, str> {
-    let count = *name_counts.entry(name).and_modify(|c| *c += 1).or_default();
-
-    if count == 0 {
-        Cow::Borrowed(name)
-    } else {
-        Cow::Owned(format!("{}_{}", name, count))
-    }
 }
 */
