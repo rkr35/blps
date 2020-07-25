@@ -11,7 +11,7 @@ use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::ptr;
 
-use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
+// use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
 use heck::CamelCase;
 use log::info;
 use thiserror::Error;
@@ -21,6 +21,9 @@ use bitfield::{Bitfields, PostAddInstruction};
 
 #[cfg(feature = "genial")]
 mod genial;
+
+#[cfg(feature = "genial")]
+use genial::{Scope, Writer, WriterWrapper};
 
 mod helper;
 
@@ -105,16 +108,15 @@ pub unsafe fn sdk() -> Result<(), Error> {
 
     find_static_classes()?;
 
-    let mut scope = Scope::new();
+    let sdk = Writer::from(File::create(SDK_PATH).map(BufWriter::new)?);
+    let mut scope = Scope::new(sdk);
 
-    add_crate_attributes(&mut scope);
-    add_imports(&mut scope);
+    add_crate_attributes(&mut scope)?;
+    add_imports(&mut scope)?;
 
-    for object in (*GLOBAL_OBJECTS).iter() {
-        write_object(&mut scope, object)?;
-    }
-
-    fs::write(SDK_PATH, scope.to_string())?;
+    // for object in (*GLOBAL_OBJECTS).iter() {
+    //     write_object(&mut scope, object)?;
+    // }
 
     Ok(())
 }
@@ -133,26 +135,31 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     Ok(())
 }
 
-fn add_crate_attributes(scope: &mut Scope) {
-    scope.raw(
+fn add_crate_attributes<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
+    scope.line(
         "#![allow(bindings_with_variant_name)]\n\
          #![allow(clippy::doc_markdown)]\n\
          #![allow(dead_code)]\n\
          #![allow(non_camel_case_types)]\n\
-         #![allow(non_snake_case)]",
-    );
+         #![allow(non_snake_case)]\n",
+    )?;
+
+    Ok(())
 }
 
-fn add_imports(scope: &mut Scope) {
-    scope.raw(
+fn add_imports<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
+    scope.line(
         "use crate::GLOBAL_OBJECTS;\n\
          use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
          use crate::hook::bitfield::{is_bit_set, set_bit};\n\
          use std::mem::MaybeUninit;\n\
-         use std::ops::{Deref, DerefMut};",
-    );
+         use std::ops::{Deref, DerefMut};\n",
+    )?;
+
+    Ok(())
 }
 
+/*
 unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     if (*object).is(CONSTANT) {
         write_constant(sdk, object)?;
@@ -701,3 +708,4 @@ fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) ->
         Cow::Owned(format!("{}_{}", name, count))
     }
 }
+*/
