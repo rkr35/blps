@@ -315,7 +315,7 @@ fn impl_fn() {
         scope
             .imp("Struct")
             .unwrap()
-            .function_args_ret(Visibility::Private, "test", &args, ret)
+            .function_args_ret(Nil, "test", &args, ret)
             .unwrap()
             .line("// Function implementation.")
             .unwrap();
@@ -335,7 +335,7 @@ fn impl_method_no_args_no_ret() {
         scope
             .imp("Struct")
             .unwrap()
-            .function_args(Visibility::Private, "test", args!("&mut self"))
+            .function_args(Nil, "test", args!("&mut self"))
             .unwrap()
             .line("// Function implementation.")
             .unwrap();
@@ -359,7 +359,7 @@ fn impl_method_args_no_ret() {
         scope
             .imp("Struct")
             .unwrap()
-            .function_args(Visibility::Private, "test", args)
+            .function_args(Nil, "test", args)
             .unwrap()
             .line("// Function implementation.")
             .unwrap();
@@ -384,7 +384,7 @@ fn impl_method_args_ret() {
         scope
             .imp("Struct")
             .unwrap()
-            .function_args_ret(Visibility::Private, "test", args, ret)
+            .function_args_ret(Nil, "test", args, ret)
             .unwrap()
             .line("// Function implementation.")
             .unwrap();
@@ -415,7 +415,7 @@ fn fn_no_args_no_ret_public() {
 
     {
         let mut scope = Scope::new(Writer::from(&mut buffer));
-        let _function = scope.function(Visibility::Public, "test").unwrap();
+        let _function = scope.function("pub ", "test").unwrap();
     }
 
     let buffer = str::from_utf8(&buffer).unwrap();
@@ -431,7 +431,7 @@ fn fn_args_no_ret() {
         let mut scope = Scope::new(Writer::from(&mut buffer));
         let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
         let _function = scope
-            .function_args(Visibility::Private, "test", &args)
+            .function_args(Nil, "test", &args)
             .unwrap();
     }
 
@@ -449,7 +449,7 @@ fn fn_args_ret() {
         let args = [["arg1", "typ1"], ["arg2", "typ2"], ["arg3", "typ3"]];
         let ret = "impl Iterator<Item = u8>";
         let _function = scope
-            .function_args_ret(Visibility::Private, "test", &args, ret)
+            .function_args_ret(Nil, "test", &args, ret)
             .unwrap();
     }
 

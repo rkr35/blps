@@ -69,19 +69,19 @@ pub trait WriterWrapper<W: Write> {
 pub trait GenFunction<W: Write>: WriterWrapper<W> {
     fn function(
         &mut self,
-        vis: Visibility,
+        qualifiers: impl Display,
         name: impl Display,
     ) -> Result<Function<&mut W>, io::Error> {
-        self.function_args(vis, name, None::<(Nil, Nil)>)
+        self.function_args(qualifiers, name, None::<(Nil, Nil)>)
     }
 
     fn write_function_header(
         &mut self,
-        vis: Visibility,
+        qualifiers: impl Display,
         name: impl Display,
     ) -> Result<(), io::Error> {
         let writer = self.writer();
-        ind!(writer, "{}fn {}(", vis, name)?;
+        ind!(writer, "{}fn {}(", qualifiers, name)?;
         Ok(())
     }
 
@@ -103,11 +103,11 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
 
     fn function_args<N: Display, T: Display>(
         &mut self,
-        vis: Visibility,
+        qualifiers: impl Display,
         name: impl Display,
         args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
     ) -> Result<Function<&mut W>, io::Error> {
-        self.write_function_header(vis, name)?;
+        self.write_function_header(qualifiers, name)?;
         self.write_function_args(args)?;
 
         let writer = self.writer();
@@ -120,12 +120,12 @@ pub trait GenFunction<W: Write>: WriterWrapper<W> {
 
     fn function_args_ret<N: Display, T: Display>(
         &mut self,
-        vis: Visibility,
+        qualifiers: impl Display,
         name: impl Display,
         args: impl IntoIterator<Item = impl Into<Arg<N, T>>>,
         ret: impl Display,
     ) -> Result<Function<&mut W>, io::Error> {
-        self.write_function_header(vis, name)?;
+        self.write_function_header(qualifiers, name)?;
         self.write_function_args(args)?;
 
         let writer = self.writer();
