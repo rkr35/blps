@@ -114,9 +114,9 @@ pub unsafe fn sdk() -> Result<(), Error> {
     add_crate_attributes(&mut scope)?;
     add_imports(&mut scope)?;
 
-    // for object in (*GLOBAL_OBJECTS).iter() {
-    //     write_object(&mut scope, object)?;
-    // }
+    for object in (*GLOBAL_OBJECTS).iter() {
+        write_object(&mut scope, object)?;
+    }
 
     Ok(())
 }
@@ -159,21 +159,22 @@ fn add_imports<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
     Ok(())
 }
 
-/*
-unsafe fn write_object(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+
+unsafe fn write_object(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     if (*object).is(CONSTANT) {
         write_constant(sdk, object)?;
-    } else if (*object).is(ENUMERATION) {
+    }/* else if (*object).is(ENUMERATION) {
         write_enumeration(sdk, object)?;
     } else if (*object).is(STRUCTURE) {
         write_structure(sdk, object)?;
     } else if (*object).is(CLASS) {
         write_class(sdk, object)?;
-    }
+    }*/
     Ok(())
 }
 
-unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+
+unsafe fn write_constant(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     let value = {
         // Cast so we can access fields of constant.
         let object: *const Const = object.cast();
@@ -199,16 +200,12 @@ unsafe fn write_constant(sdk: &mut Scope, object: *const Object) -> Result<(), E
         .ok_or(Error::ConstOuter(object))?;
 
     let outer = helper::get_name(outer)?;
-
-    sdk.raw(&format!(
-        "// {}_{} = {}",
-        outer,
-        helper::get_name(object)?,
-        value
-    ));
+    let name = helper::get_name(object)?;
+    sdk.line(format_args!("// {}_{} = {}\n", outer, name, value))?;
     Ok(())
 }
 
+/*
 unsafe fn write_enumeration(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
     impl Enum {
         pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
