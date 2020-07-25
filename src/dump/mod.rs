@@ -135,7 +135,7 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     Ok(())
 }
 
-fn add_crate_attributes<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
+fn add_crate_attributes(scope: &mut Scope<impl Write>) -> Result<(), Error> {
     scope.line(
         "#![allow(bindings_with_variant_name)]\n\
          #![allow(clippy::doc_markdown)]\n\
