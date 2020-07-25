@@ -7,6 +7,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::OsString;
+use std::fmt::Display;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::ptr;
@@ -23,7 +24,7 @@ use bitfield::{Bitfields, PostAddInstruction};
 mod genial;
 
 #[cfg(feature = "genial")]
-use genial::{Gen, Scope, Visibility, Writer, WriterWrapper};
+use genial::{Gen, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
 
 mod helper;
 
@@ -165,11 +166,11 @@ unsafe fn write_object(sdk: &mut Scope<impl Write>, object: *const Object) -> Re
         write_constant(sdk, object)?;
     } else if (*object).is(ENUMERATION) {
         write_enumeration(sdk, object)?;
-    }/* else if (*object).is(STRUCTURE) {
+    } else if (*object).is(STRUCTURE) {
         write_structure(sdk, object)?;
     } else if (*object).is(CLASS) {
         write_class(sdk, object)?;
-    }*/
+    }
     Ok(())
 }
 
@@ -298,8 +299,7 @@ fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) ->
     }
 }
 
-/*
-unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+unsafe fn write_structure(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     let name = helper::resolve_duplicate(object)?;
 
     let structure: *const Struct = object.cast();
@@ -308,50 +308,50 @@ unsafe fn write_structure(sdk: &mut Scope, object: *const Object) -> Result<(), 
 
     let super_class: *const Struct = (*structure).super_field.cast();
 
-    let struct_gen = sdk.new_struct(&name).repr("C").vis("pub");
+    let structure_size = (*structure).property_size.into();
+    let full_name = helper::get_full_name(object)?;
 
     let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
+        sdk.line(format_args!("// {}, {:#x}", full_name, structure_size))?;
         None
     } else {
         offset = (*super_class).property_size.into();
+        let relative_size = structure_size - offset;
         let super_name = helper::get_name(super_class.cast())?;
-        emit_field(struct_gen, "base", super_name, 0, offset);
+        sdk.line(format_args!(
+            "// {}, {:#x} ({:#x} - {:#x})",
+            full_name, relative_size, structure_size, offset
+        ))?;
+
         Some(super_name)
     };
 
-    let structure_size = (*structure).property_size.into();
+    let bitfields = {
+        let mut struct_gen = sdk
+            .line("#[repr(C)]")?
+            .structure(Visibility::Public, &name)?;
 
-    {
-        let doc;
-        let full_name = helper::get_full_name(object)?;
-
-        if super_class.is_some() {
-            let relative_size = structure_size - offset;
-            doc = format!(
-                "{}, {:#x} ({:#x} - {:#x})",
-                full_name, relative_size, structure_size, offset
-            );
-        } else {
-            doc = format!("{}, {:#x}", full_name, structure_size);
+        if let Some(super_class) = super_class {
+            emit_field(&mut struct_gen, "base", super_class, 0, offset)?;
         }
 
-        struct_gen.doc(&doc);
-    }
+        let properties = get_fields(structure, offset);
+        let bitfields = add_fields(&mut struct_gen, &mut offset, properties)?;
 
-    let properties = get_fields(structure, offset);
-    let bitfields = add_fields(struct_gen, &mut offset, properties)?;
+        if offset < structure_size {
+            add_padding(&mut struct_gen, offset, structure_size - offset)?;
+        }
 
-    if offset < structure_size {
-        add_padding(struct_gen, offset, structure_size - offset);
-    }
+        bitfields
+    };
 
-    bitfields.emit(sdk, &name);
+    bitfields.emit(sdk, &name)?;
 
-    if let Some(super_class) = super_class {
-        add_deref_impls(sdk, &name, super_class);
-    } else if name == "Object" {
-        add_object_deref_impl(sdk);
-    }
+    // if let Some(super_class) = super_class {
+    //     add_deref_impls(sdk, &name, super_class);
+    // } else if name == "Object" {
+    //     add_object_deref_impl(sdk);
+    // }
 
     Ok(())
 }
@@ -382,7 +382,7 @@ unsafe fn property_compare(p: &Property, q: &Property) -> Ordering {
 }
 
 unsafe fn add_fields(
-    struct_gen: &mut StructGen,
+    struct_gen: &mut Structure<impl Write>,
     offset: &mut u32,
     properties: Vec<&Property>,
 ) -> Result<Bitfields, Error> {
@@ -392,7 +392,7 @@ unsafe fn add_fields(
 
     for property in properties {
         if *offset < property.offset {
-            add_padding(struct_gen, *offset, property.offset - *offset);
+            add_padding(struct_gen, *offset, property.offset - *offset)?;
         }
 
         let info = PropertyInfo::try_from(property)?;
@@ -435,7 +435,7 @@ unsafe fn add_fields(
             field_type.as_ref(),
             property.offset,
             total_property_size,
-        );
+        )?;
 
         *offset = property.offset + total_property_size;
     }
@@ -443,19 +443,17 @@ unsafe fn add_fields(
     Ok(bitfields)
 }
 
-fn emit_field<T: Into<Type>>(
-    struct_gen: &mut StructGen,
-    name: &str,
-    typ: T,
+fn emit_field(
+    struct_gen: &mut Structure<impl Write>,
+    name: impl Display,
+    typ: impl Display,
     offset: u32,
     length: u32,
-) {
-    let mut field = Field::new(name, typ);
-
-    let comment = format!("\n// {:#x}({:#x})", offset, length);
-    field.annotation([comment.as_ref()].into());
-
-    struct_gen.push_field(field);
+) -> Result<(), Error> {
+    struct_gen.line(Nil)?;
+    struct_gen.line(format_args!("// {:#x}({:#x})", offset, length))?;
+    struct_gen.field(name, typ)?;
+    Ok(())
 }
 
 fn scrub_reserved_name(name: &str) -> &str {
@@ -465,54 +463,60 @@ fn scrub_reserved_name(name: &str) -> &str {
     }
 }
 
-fn add_padding(struct_gen: &mut StructGen, offset: u32, size: u32) {
-    let name = format!("pad_at_{:#x}", offset);
-    let typ = format!("[u8; {:#x}]", size);
-    emit_field(struct_gen, &name, typ, offset, size);
+fn add_padding(struct_gen: &mut Structure<impl Write>, offset: u32, size: u32) -> Result<(), Error> {
+    emit_field(
+        struct_gen,
+        format_args!("pad_at_{:#x}", offset),
+        format_args!("[u8; {:#x}]", size),
+        offset,
+        size
+    )
 }
 
-fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
-    sdk.new_impl(derived_name)
-        .impl_trait("Deref")
-        .associate_type("Target", base_name)
-        .new_fn("deref")
-        .arg_ref_self()
-        .ret("&Self::Target")
-        .line("&self.base");
+// fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
+//     sdk.new_impl(derived_name)
+//         .impl_trait("Deref")
+//         .associate_type("Target", base_name)
+//         .new_fn("deref")
+//         .arg_ref_self()
+//         .ret("&Self::Target")
+//         .line("&self.base");
 
-    sdk.new_impl(derived_name)
-        .impl_trait("DerefMut")
-        .new_fn("deref_mut")
-        .arg_mut_self()
-        .ret("&mut Self::Target")
-        .line("&mut self.base");
-}
+//     sdk.new_impl(derived_name)
+//         .impl_trait("DerefMut")
+//         .new_fn("deref_mut")
+//         .arg_mut_self()
+//         .ret("&mut Self::Target")
+//         .line("&mut self.base");
+// }
 
-/// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) ->
-/// `&[mut] game::Object` (handwritten with helpful impls)
-fn add_object_deref_impl(sdk: &mut Scope) {
-    sdk.new_impl("Object")
-        .impl_trait("Deref")
-        .associate_type("Target", "game::Object")
-        .new_fn("deref")
-        .arg_ref_self()
-        .ret("&Self::Target")
-        .line("unsafe { &*(self as *const Self as *const Self::Target) }");
+// /// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) ->
+// /// `&[mut] game::Object` (handwritten with helpful impls)
+// fn add_object_deref_impl(sdk: &mut Scope) {
+//     sdk.new_impl("Object")
+//         .impl_trait("Deref")
+//         .associate_type("Target", "game::Object")
+//         .new_fn("deref")
+//         .arg_ref_self()
+//         .ret("&Self::Target")
+//         .line("unsafe { &*(self as *const Self as *const Self::Target) }");
 
-    sdk.new_impl("Object")
-        .impl_trait("DerefMut")
-        .new_fn("deref_mut")
-        .arg_mut_self()
-        .ret("&mut Self::Target")
-        .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }");
-}
+//     sdk.new_impl("Object")
+//         .impl_trait("DerefMut")
+//         .new_fn("deref_mut")
+//         .arg_mut_self()
+//         .ret("&mut Self::Target")
+//         .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }");
+// }
 
-unsafe fn write_class(sdk: &mut Scope, object: *const Object) -> Result<(), Error> {
+
+unsafe fn write_class(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     write_structure(sdk, object)?;
-    add_methods(sdk, object.cast())?;
+    // add_methods(sdk, object.cast())?;
     Ok(())
 }
 
+/*
 unsafe fn add_methods(sdk: &mut Scope, class: *const Struct) -> Result<(), Error> {
     let name = helper::resolve_duplicate(class.cast())?;
     let impl_gen = sdk.new_impl(&name);
