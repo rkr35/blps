@@ -265,7 +265,7 @@ macro_rules! args {
     }};
 
     ($receiver:literal, $args:expr) => {{
-        use crate::dump::genial::{Arg, Nil};
+        use crate::dump::genial::Arg;
         std::iter::once(Arg::Receiver($receiver)).chain($args.map(Arg::from))
     }};
 }
