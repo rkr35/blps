@@ -1,3 +1,6 @@
+#[cfg(feature = "genial")]
+use crate::args;
+
 use crate::game::{cast, BoolProperty, Class, Const, Enum, Function, Object, Property, Struct};
 use crate::TimeIt;
 use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
@@ -24,7 +27,7 @@ use bitfield::{Bitfields, PostAddInstruction};
 mod genial;
 
 #[cfg(feature = "genial")]
-use genial::{Gen, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
+use genial::{Gen, GenFunction, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
 
 mod helper;
 
@@ -347,11 +350,11 @@ unsafe fn write_structure(sdk: &mut Scope<impl Write>, object: *const Object) ->
 
     bitfields.emit(sdk, &name)?;
 
-    // if let Some(super_class) = super_class {
-    //     add_deref_impls(sdk, &name, super_class);
-    // } else if name == "Object" {
-    //     add_object_deref_impl(sdk);
-    // }
+    if let Some(super_class) = super_class {
+        add_deref_impls(sdk, &name, super_class)?;
+    } else if name == "Object" {
+        add_object_deref_impl(sdk)?;
+    }
 
     Ok(())
 }
@@ -473,41 +476,37 @@ fn add_padding(struct_gen: &mut Structure<impl Write>, offset: u32, size: u32) -
     )
 }
 
-// fn add_deref_impls(sdk: &mut Scope, derived_name: &str, base_name: &str) {
-//     sdk.new_impl(derived_name)
-//         .impl_trait("Deref")
-//         .associate_type("Target", base_name)
-//         .new_fn("deref")
-//         .arg_ref_self()
-//         .ret("&Self::Target")
-//         .line("&self.base");
+fn add_deref_impls(sdk: &mut Scope<impl Write>, derived_name: &str, base_name: &str) -> Result<(), Error> {
+    sdk
+        .imp_trait("Deref", derived_name)?
+        .line(format_args!("type Target = {};\n", base_name))?
+        .function_args_ret("", "deref", args!("&self"), "&Self::Target")?
+        .line("&self.base")?;
 
-//     sdk.new_impl(derived_name)
-//         .impl_trait("DerefMut")
-//         .new_fn("deref_mut")
-//         .arg_mut_self()
-//         .ret("&mut Self::Target")
-//         .line("&mut self.base");
-// }
+    sdk
+        .imp_trait("DerefMut", derived_name)?
+        .function_args_ret("", "deref_mut", args!("&mut self"), "&mut Self::Target")?
+        .line("&mut self.base")?;
 
-// /// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) ->
-// /// `&[mut] game::Object` (handwritten with helpful impls)
-// fn add_object_deref_impl(sdk: &mut Scope) {
-//     sdk.new_impl("Object")
-//         .impl_trait("Deref")
-//         .associate_type("Target", "game::Object")
-//         .new_fn("deref")
-//         .arg_ref_self()
-//         .ret("&Self::Target")
-//         .line("unsafe { &*(self as *const Self as *const Self::Target) }");
+    Ok(())
+}
 
-//     sdk.new_impl("Object")
-//         .impl_trait("DerefMut")
-//         .new_fn("deref_mut")
-//         .arg_mut_self()
-//         .ret("&mut Self::Target")
-//         .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }");
-// }
+/// Add a `Deref` and `DerefMut` for `&[mut] sdk::Object` (generated) ->
+/// `&[mut] game::Object` (handwritten with helpful impls)
+fn add_object_deref_impl(sdk: &mut Scope<impl Write>) -> Result<(), Error> {
+    sdk
+        .imp_trait("Deref", "Object")?
+        .line("type Target = game::Object;\n")?
+        .function_args_ret("", "deref", args!("&self"), "&Self::Target")?
+        .line("unsafe { &*(self as *const Self as *const Self::Target) }")?;
+
+    sdk
+        .imp_trait("DerefMut", "Object")?
+        .function_args_ret("", "deref_mut", args!("&mut self"), "&mut Self::Target")?
+        .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }")?;
+
+    Ok(())
+}
 
 
 unsafe fn write_class(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
