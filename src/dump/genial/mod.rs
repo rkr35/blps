@@ -259,12 +259,12 @@ impl<W: Write> Scope<W> {
 
 #[macro_export]
 macro_rules! args {
-    ($receiver:literal) => {{
+    ($receiver:expr) => {{
         use crate::dump::genial::{Arg, Nil};
         std::iter::once(Arg::<Nil, Nil>::Receiver($receiver))
     }};
 
-    ($receiver:literal, $args:expr) => {{
+    ($receiver:expr, $args:expr) => {{
         use crate::dump::genial::Arg;
         std::iter::once(Arg::Receiver($receiver)).chain($args.map(Arg::from))
     }};
