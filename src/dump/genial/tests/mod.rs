@@ -529,11 +529,46 @@ fn block_empty() {
         scope
             .function(Visibility::Private, "test")
             .unwrap()
-            .block(Nil)
+            .block(Nil, BlockSuffix::None)
             .unwrap();
     }
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
     assert_eq!(buffer, include_str!("block_empty.expected"));
+}
+
+#[test]
+fn block_structure_and_init() {
+    let mut buffer = vec![];
+
+    {
+        let mut scope = Scope::new(Writer::from(&mut buffer));
+        
+        let mut function = scope
+            .function(Visibility::Private, "test")
+            .unwrap();
+        
+        let mut block = function.block(Nil, BlockSuffix::None).unwrap();
+
+        {
+            let mut structure = block
+                .structure(Visibility::Public, "MyStruct")
+                .unwrap();
+
+            structure.field("a", "u32").unwrap();
+            structure.field("b", "String").unwrap();
+        }
+
+        block.line("let b = String::from(\"my_string\");").unwrap();
+        block.line(Nil).unwrap();
+
+        let mut struct_init = block.block("let my_struct = MyStruct ", BlockSuffix::Semicolon).unwrap();
+        struct_init.line("a: 534,").unwrap();
+        struct_init.line("b,").unwrap();
+    }
+
+    let buffer = str::from_utf8(&buffer).unwrap();
+
+    assert_eq!(buffer, include_str!("block_structure_and_init.expected"));
 }

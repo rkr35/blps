@@ -189,12 +189,14 @@ pub trait Gen<W: Write>: WriterWrapper<W> {
     fn block(
         &mut self,
         prefix: impl Display,
+        suffix: BlockSuffix,
     ) -> Result<Block<&mut W>, io::Error> {
         let writer = self.writer();
         ind_ln!(writer, "{}{{", prefix)?;
 
         Ok(Block {
             writer: self.writer().nest(),
+            suffix,
         })
     }
 }
@@ -235,7 +237,7 @@ macro_rules! impl_closing_brace_drop {
 
 impl_writer_wrapper! { Scope Structure Enumeration Impl Function IfBlock Block }
 impl_gen! { Scope Function IfBlock Block }
-impl_closing_brace_drop! { Structure Enumeration Impl Function IfBlock Block }
+impl_closing_brace_drop! { Structure Enumeration Impl Function IfBlock }
 
 impl<W: Write> GenFunction<W> for Impl<W> {}
 
@@ -363,9 +365,33 @@ impl<W: Write> IfBlock<W> {
 
 pub struct Block<W: Write> {
     writer: Writer<W>,
+    suffix: BlockSuffix,
 }
 
 impl<W: Write> Block<W> {
+}
+
+impl<W: Write> Drop for Block<W> {
+    fn drop(&mut self) {
+        self.writer.undent();
+        let suffix = self.suffix;
+        ind_ln!(self.writer, "}}{}\n", suffix).unwrap();
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum BlockSuffix {
+    None,
+    Semicolon,
+}
+
+impl Display for BlockSuffix {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Self::None => Ok(()),
+            Self::Semicolon => ';'.fmt(f),
+        }
+    }
 }
 
 pub struct Nil;
