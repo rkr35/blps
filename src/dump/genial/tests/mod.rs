@@ -519,3 +519,21 @@ fn fn_else_block() {
 
     assert_eq!(buffer, include_str!("fn_else_block.expected"));
 }
+
+#[test]
+fn block_empty() {
+    let mut buffer = vec![];
+
+    {
+        let mut scope = Scope::new(Writer::from(&mut buffer));
+        scope
+            .function(Visibility::Private, "test")
+            .unwrap()
+            .block(Nil)
+            .unwrap();
+    }
+
+    let buffer = str::from_utf8(&buffer).unwrap();
+
+    assert_eq!(buffer, include_str!("block_empty.expected"));
+}

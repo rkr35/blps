@@ -185,6 +185,18 @@ pub trait Gen<W: Write>: WriterWrapper<W> {
             writer: self.writer().nest(),
         })
     }
+
+    fn block(
+        &mut self,
+        prefix: impl Display,
+    ) -> Result<Block<&mut W>, io::Error> {
+        let writer = self.writer();
+        ind_ln!(writer, "{}{{", prefix)?;
+
+        Ok(Block {
+            writer: self.writer().nest(),
+        })
+    }
 }
 
 macro_rules! impl_writer_wrapper {
@@ -221,9 +233,9 @@ macro_rules! impl_closing_brace_drop {
     }
 }
 
-impl_writer_wrapper! { Scope Structure Enumeration Impl Function IfBlock }
-impl_gen! { Scope Function IfBlock }
-impl_closing_brace_drop! { Structure Enumeration Impl Function IfBlock }
+impl_writer_wrapper! { Scope Structure Enumeration Impl Function IfBlock Block }
+impl_gen! { Scope Function IfBlock Block }
+impl_closing_brace_drop! { Structure Enumeration Impl Function IfBlock Block }
 
 impl<W: Write> GenFunction<W> for Impl<W> {}
 
@@ -347,6 +359,13 @@ impl<W: Write> IfBlock<W> {
 
         Ok(self)
     }
+}
+
+pub struct Block<W: Write> {
+    writer: Writer<W>,
+}
+
+impl<W: Write> Block<W> {
 }
 
 pub struct Nil;
