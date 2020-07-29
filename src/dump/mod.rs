@@ -614,6 +614,29 @@ impl<'a> TryFrom<&'a Function> for Parameters<'a> {
     }
 }
 
+enum OutputPrototype {
+    None,
+    Single(String),
+    Multiple(String),
+}
+
+impl From<OutputPrototype> for Option<String> {
+    fn from(op: OutputPrototype) -> Self {
+        match op {
+            OutputPrototype::None => None,
+            OutputPrototype::Single(s) => Some(s),
+            OutputPrototype::Multiple(mut s) => {
+                // Replace trailing ", " with ")>".
+                // Example: `Option<(Vector, Vector, ` becomes `Option<(Vector, Vector)>`
+                s.pop();
+                s.pop();
+                s.push_str(")>");
+                Some(s)
+            }
+        }
+    }
+}
+
 unsafe fn add_method(
     impl_gen: &mut Impl<impl Write>,
     method_name_counts: &mut HashMap<&str, u8>,
@@ -633,29 +656,6 @@ unsafe fn add_method(
             inputs.push(parameter);
         } else if parameter.kind == ParameterKind::Output {
             outputs.push(parameter);
-        }
-    }
-
-    enum OutputPrototype {
-        None,
-        Single(String),
-        Multiple(String),
-    }
-
-    impl From<OutputPrototype> for Option<String> {
-        fn from(op: OutputPrototype) -> Self {
-            match op {
-                OutputPrototype::None => None,
-                OutputPrototype::Single(s) => Some(s),
-                OutputPrototype::Multiple(mut s) => {
-                    // Replace trailing ", " with ")>".
-                    // Example: `Option<(Vector, Vector, ` becomes `Option<(Vector, Vector)>`
-                    s.pop();
-                    s.pop();
-                    s.push_str(")>");
-                    Some(s)
-                }
-            }
         }
     }
 
