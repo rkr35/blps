@@ -64,6 +64,14 @@ pub trait WriterWrapper<W: Write> {
         write!(writer.writer, "{}", raw)?;
         Ok(self)
     }
+
+    fn indent(&mut self) {
+        self.writer().indent();
+    }
+
+    fn undent(&mut self) {
+        self.writer().undent();
+    }
 }
 
 pub trait GenFunction<W: Write>: WriterWrapper<W> {

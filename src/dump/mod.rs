@@ -10,8 +10,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::OsString;
-use std::fmt::Display;
-use std::fs::{self, File};
+use std::fmt::{self, Display};
+use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::ptr;
 
@@ -27,7 +27,7 @@ use bitfield::{Bitfields, PostAddInstruction};
 mod genial;
 
 #[cfg(feature = "genial")]
-use genial::{Gen, GenFunction, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
+use genial::{Arg, BlockSuffix, Gen, GenFunction, Impl, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
 
 mod helper;
 
@@ -47,6 +47,9 @@ pub enum Error {
 
     #[error("unable to get the outer class for constant {0:?}")]
     ConstOuter(*const Object),
+
+    #[error("fmt error: {0}")]
+    Fmt(#[from] fmt::Error),
 
     #[error("helper error: {0}")]
     Helper(#[from] helper::Error),
@@ -511,19 +514,18 @@ fn add_object_deref_impl(sdk: &mut Scope<impl Write>) -> Result<(), Error> {
 
 unsafe fn write_class(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     write_structure(sdk, object)?;
-    // add_methods(sdk, object.cast())?;
+    add_methods(sdk, object.cast())?;
     Ok(())
 }
 
-/*
-unsafe fn add_methods(sdk: &mut Scope, class: *const Struct) -> Result<(), Error> {
+unsafe fn add_methods(sdk: &mut Scope<impl Write>, class: *const Struct) -> Result<(), Error> {
     let name = helper::resolve_duplicate(class.cast())?;
-    let impl_gen = sdk.new_impl(&name);
+    let mut impl_gen = sdk.imp(name)?;
 
     let mut method_name_counts: HashMap<&str, u8> = HashMap::new();
 
     for method in get_methods(class) {
-        add_method(impl_gen, &mut method_name_counts, method)?;
+        add_method(&mut impl_gen, &mut method_name_counts, method)?;
     }
 
     Ok(())
@@ -547,6 +549,18 @@ struct Parameter<'a> {
     kind: ParameterKind,
     name: Cow<'a, str>,
     typ: Cow<'a, str>,
+}
+
+impl<'a> From<Parameter<'a>> for Arg<Cow<'a, str>, Cow<'a, str>> {
+    fn from(p: Parameter<'a>) -> Self {
+        Self::NameType(p.name, p.typ)
+    }
+}
+
+impl<'a> From<&'a Parameter<'a>> for Arg<&'a Cow<'a, str>, &'a Cow<'a, str>> {
+    fn from(p: &'a Parameter<'a>) -> Arg<&'a Cow<'a, str>, &'a Cow<'a, str>> {
+        Self::NameType(&p.name, &p.typ)
+    }
 }
 
 #[derive(Default)]
@@ -601,113 +615,150 @@ impl<'a> TryFrom<&'a Function> for Parameters<'a> {
 }
 
 unsafe fn add_method(
-    impl_gen: &mut Impl,
+    impl_gen: &mut Impl<impl Write>,
     method_name_counts: &mut HashMap<&str, u8>,
     method: &Function,
 ) -> Result<(), Error> {
+    const FN_QUALIFIERS: &str = "pub unsafe ";
+    const FN_RECEIVER: &str = "&mut self";
+
     let name = get_unique_name(method_name_counts, helper::get_name(method as &Object)?);
+    let Parameters(parameters) = Parameters::try_from(method)?;
+    
+    let mut inputs = vec![];
+    let mut outputs = vec![];
 
-    let method_gen = impl_gen
-        .new_fn(&name)
-        .vis("pub unsafe")
-        .line("static mut FUNCTION: Option<*mut game::Function> = None;\n")
-        .arg_mut_self();
+    for parameter in &parameters {
+        if parameter.kind == ParameterKind::Input {
+            inputs.push(parameter);
+        } else if parameter.kind == ParameterKind::Output {
+            outputs.push(parameter);
+        }
+    }
 
-    let parameters = Parameters::try_from(method)?;
+    enum OutputPrototype {
+        None,
+        Single(String),
+        Multiple(String),
+    }
 
-    let mut structure = Block::new("#[repr(C)]\nstruct Parameters");
-    let mut structure_init = Block::new("let mut p = Parameters");
-    let mut return_tuple = vec![];
-
-    // TODO: ARRAY PARAMETERS: Parameters `p` such that `p.property.array_dim > 1`
-    for parameter in parameters.0 {
-        match parameter.kind {
-            ParameterKind::Input => {
-                method_gen.arg(&parameter.name, parameter.typ.as_ref());
-                structure.line(format!("{}: {},", parameter.name, parameter.typ));
-                structure_init.line(format!("{},", parameter.name));
-            }
-
-            ParameterKind::Output => {
-                structure.line(format!(
-                    "{}: MaybeUninit<{}>,",
-                    parameter.name, parameter.typ
-                ));
-                structure_init.line(format!("{}: MaybeUninit::uninit(),", parameter.name));
-                return_tuple.push((format!("p.{}.assume_init()", parameter.name), parameter.typ));
+    impl From<OutputPrototype> for Option<String> {
+        fn from(op: OutputPrototype) -> Self {
+            match op {
+                OutputPrototype::None => None,
+                OutputPrototype::Single(s) => Some(s),
+                OutputPrototype::Multiple(mut s) => {
+                    // Replace trailing ", " with ")>".
+                    // Example: `Option<(Vector, Vector, ` becomes `Option<(Vector, Vector)>`
+                    s.pop();
+                    s.pop();
+                    s.push_str(")>");
+                    Some(s)
+                }
             }
         }
     }
 
-    let mut if_block = Block::new("if let Some(function) = FUNCTION");
+    let mut output_prototype = OutputPrototype::None;
+    
+    if outputs.len() == 1 {
+        output_prototype = OutputPrototype::Single(format!("Option<{}>", outputs[0].typ));
+    }
 
-    structure.after("\n");
-    if_block.push_block(structure);
+    for output in &outputs {
+        match &mut output_prototype {
+            OutputPrototype::None => output_prototype = OutputPrototype::Multiple(format!("Option<({}, ", output.typ)),
+            
+            OutputPrototype::Multiple(s) => {
+                s.push_str(&output.typ);
+                s.push_str(", ");
+            }
 
-    structure_init.after(";\n");
-    if_block.push_block(structure_init);
+            _ => (),
+        }
+    }
 
-    if_block.line("let old_flags = (*function).flags;");
+    let output_prototype: Option<String> = output_prototype.into();
+    
+    let mut function_gen = match (inputs.as_slice(), output_prototype) {
+        ([], None) => impl_gen.function_args(FN_QUALIFIERS, name, args!(FN_RECEIVER))?,
+
+        ([], Some(outs)) => impl_gen.function_args_ret(FN_QUALIFIERS, name, args!(FN_RECEIVER), outs)?,
+        
+        (_, None) => impl_gen.function_args(FN_QUALIFIERS, name, args!(FN_RECEIVER, inputs.iter()))?,
+        
+        (_, Some(outs)) => impl_gen.function_args_ret(FN_QUALIFIERS, name, args!(FN_RECEIVER, inputs.iter()), outs)?,
+    };
+
+    function_gen.line("static mut FUNCTION: Option<*mut game::Function> = None;\n")?;
+
+    let mut if_block = function_gen.if_block("if let Some(function) = FUNCTION")?;
+
+    if_block.line("#[repr(C)]")?;
+
+    {
+        let mut params_struct = if_block.structure(Visibility::Public, "Parameters")?;
+
+        for param in &parameters {
+            if param.kind == ParameterKind::Input {
+                params_struct.field(&param.name, &param.typ)?;
+            } else if param.kind == ParameterKind::Output {
+                params_struct.field(&param.name, format_args!("MaybeUninit<{}>", param.typ))?;
+            }
+        }
+    }
+
+    {
+
+        let mut struct_init = if_block.block("let mut p = Parameters ", BlockSuffix::Semicolon)?;
+
+        for param in &parameters {
+            if param.kind == ParameterKind::Input {
+                struct_init.line(format_args!("{},", &param.name))?;
+            } else if param.kind == ParameterKind::Output {
+                struct_init.line(format_args!("{}: MaybeUninit::uninit(),", &param.name))?;
+            }
+        }
+    }
+
+    if_block.line("let old_flags = (*function).flags;")?;
 
     if method.is_native() {
-        if_block.line("(*function).flags |= 0x400;");
+        if_block.line("(*function).flags |= 0x400;")?;
     }
 
-    if_block.line("self.process_event(function, &mut p as *mut Parameters as *mut _);");
+    if_block.line("self.process_event(function, &mut p as *mut Parameters as *mut _);")?;
+    if_block.line("(*function).flags = old_flags;\n")?;
 
-    if_block.line("(*function).flags = old_flags;");
-
-    match &return_tuple[..] {
+    match outputs.as_slice() {
         [] => (),
-
-        [(ident, typ)] => {
-            if_block.line(format!("\nSome({})", ident));
-            method_gen.ret(format!("Option<{}>", typ));
+        
+        [single_ret] => {
+            if_block.line(format_args!("Some(p.{}.assume_init())", single_ret.name))?;
         }
-
-        _ => {
-            let mut idents = String::from("\nSome((");
-            let mut ret = String::from("Option<(");
-
-            for (ident, typ) in &return_tuple {
-                idents.push_str(ident);
-                idents.push_str(", ");
-
-                ret.push_str(typ);
-                ret.push_str(", ");
+        
+        [multiple_ret @ .., last_ret] => {
+            if_block.put("Some((")?;
+            
+            for ret in multiple_ret {
+                if_block.raw(format_args!("p.{}.assume_init(), ", ret.name))?;
             }
 
-            // Remove trailing ", "
-            idents.pop();
-            idents.pop();
-
-            ret.pop();
-            ret.pop();
-
-            idents.push_str("))");
-            ret.push_str(")>");
-
-            if_block.line(idents);
-            method_gen.ret(ret);
+            if_block.raw(format_args!("p.{}.assume_init()))\n", last_ret.name))?;
         }
     }
 
-    if_block.after(" else");
+    let mut else_block = if_block.else_block("else")?;
 
-    let mut else_block = Block::new("");
+    else_block.line("FUNCTION = (*GLOBAL_OBJECTS)")?;
+    else_block.indent();
+    else_block.line(format_args!(".find_mut(\"{}\")", helper::get_full_name(method as &Object)?))?;
+    else_block.line(".map(|o| o.cast());")?;
+    else_block.undent();
 
-    else_block.line(format!(
-        "FUNCTION = (*GLOBAL_OBJECTS).find_mut(\"{}\").map(|o| o.cast());",
-        helper::get_full_name(method as &Object)?
-    ));
-
-    if !return_tuple.is_empty() {
-        else_block.line("None");
+    if !outputs.is_empty() {
+        else_block.line("None")?;
     }
-
-    method_gen.push_block(if_block);
-    method_gen.push_block(else_block);
 
     Ok(())
 }
-*/
