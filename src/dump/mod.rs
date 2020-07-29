@@ -748,7 +748,7 @@ unsafe fn add_method(
         }
     }
 
-    let mut else_block = if_block.else_block("else")?;
+    let else_block = if_block.else_block("else")?;
 
     else_block.line("FUNCTION = (*GLOBAL_OBJECTS)")?;
     else_block.indent();
