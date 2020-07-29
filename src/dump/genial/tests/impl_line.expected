@@ -1,0 +1,4 @@
+impl Struct {
+    // I'm a line inside of an `impl` block.
+}
+

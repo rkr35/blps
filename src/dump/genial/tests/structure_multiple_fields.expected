@@ -1,0 +1,6 @@
+struct Test {
+    field1: u32,
+    field2: Option<(bool, f32, String, i128)>,
+    field3: [u8; 32],
+}
+

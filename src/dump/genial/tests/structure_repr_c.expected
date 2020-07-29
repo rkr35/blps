@@ -1,0 +1,4 @@
+#[repr(C)]
+struct Test {
+}
+

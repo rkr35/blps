@@ -1,0 +1,7 @@
+enum TestEnum {
+    TestVariant1,
+    TestVariant2,
+    TestVariant3,
+    TestVariant4,
+}
+

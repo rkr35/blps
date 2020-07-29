@@ -1,0 +1,6 @@
+#[repr(C)]
+/// Second line
+/// Third line
+struct Test {
+}
+

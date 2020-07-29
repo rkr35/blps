@@ -1,7 +1,11 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::io::{self, Write};
 
-use codegen::{Impl, Scope};
+use super::genial::{Gen, GenFunction, Impl, Scope, WriterWrapper};
+
+use crate::args;
+
 use heck::SnakeCase;
 
 pub const FIELD: &str = "bitfield";
@@ -23,7 +27,7 @@ impl Bitfield {
         self.fields.push(field);
     }
 
-    pub fn emit(self, imp: &mut Impl, name: &str) {
+    pub fn emit(self, imp: &mut Impl<impl Write>, name: &str) -> Result<(), io::Error> {
         let mut counts: HashMap<Cow<str>, usize> = HashMap::new();
 
         let mut get_count = |s| *counts.entry(s).and_modify(|c| *c += 1).or_default();
@@ -65,20 +69,18 @@ impl Bitfield {
                 normalized
             };
 
-            imp.new_fn(&format!("is_{}", normalized))
-                .doc(&format!("get {}", field))
-                .vis("pub")
-                .arg_ref_self()
-                .ret("bool")
-                .line(format!("is_bit_set(self.{}, {})", name, bit));
+            imp
+                .line(format_args!("// get {}", field))?
+                .function_args_ret("pub ", format_args!("is_{}", normalized), args!("&self"), "bool")?
+                .line(format_args!("is_bit_set(self.{}, {})", name, bit))?;
 
-            imp.new_fn(&format!("set_{}", normalized))
-                .doc(&format!("set {}", field))
-                .vis("pub")
-                .arg_mut_self()
-                .arg("value", "bool")
-                .line(format!("set_bit(&mut self.{}, {}, value);", name, bit));
+            imp
+                .line(format_args!("// set {}", field))?
+                .function_args("pub ", format_args!("set_{}", normalized), args!("&mut self", [("value", "bool")].iter()))?
+                .line(format_args!("set_bit(&mut self.{}, {}, value);", name, bit))?;
         }
+
+        Ok(())
     }
 }
 
@@ -115,12 +117,12 @@ impl Bitfields {
         }
     }
 
-    pub fn emit(self, sdk: &mut Scope, structure: &str) {
+    pub fn emit(self, sdk: &mut Scope<impl Write>, structure: &str) -> Result<(), io::Error> {
         if self.bitfields.is_empty() {
-            return;
+            return Ok(());
         }
 
-        let imp = sdk.new_impl(structure);
+        let mut imp = sdk.imp(structure)?;
 
         for (i, bitfield) in self.bitfields.into_iter().enumerate() {
             let name: Cow<str> = if i > 0 {
@@ -129,7 +131,9 @@ impl Bitfields {
                 FIELD.into()
             };
 
-            bitfield.emit(imp, &name);
+            bitfield.emit(&mut imp, &name)?;
         }
+
+        Ok(())
     }
 }

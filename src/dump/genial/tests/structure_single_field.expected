@@ -1,0 +1,4 @@
+struct Test {
+    field1: u32,
+}
+

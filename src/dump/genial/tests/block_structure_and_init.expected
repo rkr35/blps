@@ -1,0 +1,18 @@
+fn test() {
+    {
+        pub struct MyStruct {
+            a: u32,
+            b: String,
+        }
+
+        let b = String::from("my_string");
+        
+        let my_struct = MyStruct {
+            a: 534,
+            b,
+        };
+
+    }
+
+}
+

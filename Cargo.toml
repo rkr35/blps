@@ -15,9 +15,8 @@ lto = "fat"
 panic = "abort"
 
 [features]
-default = ["hook"]
-#default = ["dump"]
-dump = ["codegen", "heck"]
+dump = ["codegen", "genial", "heck"]
+genial = []
 hook = ["detours-sys"]
 
 [dependencies]

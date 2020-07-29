@@ -13,7 +13,12 @@ use yank::Yank;
 
 pub static mut CONTROLLER: *mut WillowPlayerController = ptr::null_mut();
 
-pub unsafe fn process_event(this: *mut Object, method: *mut Function, parameters: *mut c_void, _return_value: *mut c_void) {
+pub unsafe fn process_event(
+    this: *mut Object,
+    method: *mut Function,
+    parameters: *mut c_void,
+    _return_value: *mut c_void,
+) {
     let indexes = CACHED_FUNCTION_INDEXES.yank_ref();
     let method_index = (*method).index;
 

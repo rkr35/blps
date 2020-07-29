@@ -1,21 +1,23 @@
+use std::fmt::Display;
 use std::time::Instant;
 
 use log::info;
 
-pub struct TimeIt {
+pub struct TimeIt<T: Display> {
     begin: Instant,
-    task: String,
+    task: T,
 }
 
-impl TimeIt {
-    pub fn new(task: &str) -> Self {
-        let task = String::from(task);
-        let begin = Instant::now();
-        Self { begin, task }
+impl<T: Display> TimeIt<T> {
+    pub fn new(task: T) -> Self {
+        Self {
+            begin: Instant::now(),
+            task,
+        }
     }
 }
 
-impl Drop for TimeIt {
+impl<T: Display> Drop for TimeIt<T> {
     fn drop(&mut self) {
         let elapsed = self.begin.elapsed();
         let ms = elapsed.as_millis();
