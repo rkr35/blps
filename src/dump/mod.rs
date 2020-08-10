@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::ffi::OsString;
 use std::fmt::{self, Display};
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::fs::{self, File};
+use std::io::{self, BufWriter, ErrorKind, Write};
+use std::path::Path;
 use std::ptr;
 
 // use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
@@ -109,20 +110,30 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
-    const SDK_PATH: &str = r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk.rs";
+    let sdk_path = Path::new(r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk\");
+
+    if let Err(e) = fs::create_dir(sdk_path) {
+        if e.kind() != ErrorKind::AlreadyExists {
+            return Err(Error::Io(e))?;
+        }
+    }
 
     let _time = TimeIt::new("sdk()");
 
     find_static_classes()?;
 
-    let sdk = Writer::from(File::create(SDK_PATH).map(BufWriter::new)?);
-    let mut scope = Scope::new(sdk);
+    let mut mod_rs = Scope::new(
+        Writer::from(
+            File::create(sdk_path.join("mod.rs"))
+                .map(BufWriter::new)?
+        )
+    );
 
-    add_crate_attributes(&mut scope)?;
-    add_imports(&mut scope)?;
+    add_crate_attributes(&mut mod_rs)?;
+    add_imports(&mut mod_rs)?;
 
     for object in (*GLOBAL_OBJECTS).iter() {
-        write_object(&mut scope, object)?;
+        write_object(&mut mod_rs, object)?;
     }
 
     Ok(())
@@ -169,7 +180,7 @@ fn add_imports<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
 
 unsafe fn write_object(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
     if (*object).is(CONSTANT) {
-        write_constant(sdk, object)?;
+        // write_constant(sdk, object)?;
     } else if (*object).is(ENUMERATION) {
         write_enumeration(sdk, object)?;
     } else if (*object).is(STRUCTURE) {
