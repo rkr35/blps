@@ -1,6 +1,16 @@
 use super::*;
 use std::str;
 
+macro_rules! eq {
+    ($left:expr, $right:expr) => {
+        assert_eq!($left, $right.replace("\r\n", "\n"))
+    };
+
+    ($left:expr, $right:expr, $msg:literal) => {
+        assert_eq!($left, $right.replace("\r\n", "\n"), $msg)
+    };
+}
+
 #[test]
 fn scope_empty() {
     let mut buffer = vec![];
@@ -11,7 +21,7 @@ fn scope_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(
+    eq!(
         buffer, "",
         "A newly created Scope should not emit anything."
     );
@@ -28,7 +38,7 @@ fn structure_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, "struct Test {\n}\n\n");
+    eq!(buffer, "struct Test {\n}\n\n");
 }
 
 #[test]
@@ -42,7 +52,7 @@ fn structure_empty_public() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, "pub struct Test {\n}\n\n");
+    eq!(buffer, "pub struct Test {\n}\n\n");
 }
 
 #[test]
@@ -60,7 +70,7 @@ fn structure_repr_c() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("structure_repr_c.expected"));
+    eq!(buffer, include_str!("structure_repr_c.expected"));
 }
 
 #[test]
@@ -78,7 +88,7 @@ fn structure_repr_c_public() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("structure_repr_c_public.expected"));
+    eq!(buffer, include_str!("structure_repr_c_public.expected"));
 }
 
 #[test]
@@ -100,7 +110,7 @@ fn structure_multiline_annotation() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(
+    eq!(
         buffer,
         include_str!("structure_multiline_annotation.expected")
     );
@@ -120,7 +130,7 @@ fn structure_single_field() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("structure_single_field.expected"));
+    eq!(buffer, include_str!("structure_single_field.expected"));
 }
 
 #[test]
@@ -143,7 +153,7 @@ fn structure_multiple_fields() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("structure_multiple_fields.expected"));
+    eq!(buffer, include_str!("structure_multiple_fields.expected"));
 }
 
 #[test]
@@ -174,7 +184,7 @@ fn structure_annotate_fields() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("structure_annotate_fields.expected"));
+    eq!(buffer, include_str!("structure_annotate_fields.expected"));
 }
 
 #[test]
@@ -189,7 +199,7 @@ fn enum_single_variant() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("enum_single_variant.expected"));
+    eq!(buffer, include_str!("enum_single_variant.expected"));
 }
 
 #[test]
@@ -204,7 +214,7 @@ fn enum_single_variant_public() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("enum_single_variant_public.expected"));
+    eq!(buffer, include_str!("enum_single_variant_public.expected"));
 }
 
 #[test]
@@ -229,7 +239,7 @@ fn enum_single_variant_annotate() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(
+    eq!(
         buffer,
         include_str!("enum_single_variant_annotate.expected")
     );
@@ -255,7 +265,7 @@ fn enum_multiple_variants() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("enum_multiple_variants.expected"));
+    eq!(buffer, include_str!("enum_multiple_variants.expected"));
 }
 
 #[test]
@@ -269,7 +279,7 @@ fn impl_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_empty.expected"));
+    eq!(buffer, include_str!("impl_empty.expected"));
 }
 
 #[test]
@@ -283,7 +293,7 @@ fn impl_trait_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_trait_empty.expected"));
+    eq!(buffer, include_str!("impl_trait_empty.expected"));
 }
 
 #[test]
@@ -301,7 +311,7 @@ fn impl_line() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_line.expected"));
+    eq!(buffer, include_str!("impl_line.expected"));
 }
 
 #[test]
@@ -323,7 +333,7 @@ fn impl_fn() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_fn.expected"));
+    eq!(buffer, include_str!("impl_fn.expected"));
 }
 
 #[test]
@@ -343,7 +353,7 @@ fn impl_method_no_args_no_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_method_no_args_no_ret.expected"));
+    eq!(buffer, include_str!("impl_method_no_args_no_ret.expected"));
 }
 
 #[test]
@@ -367,7 +377,7 @@ fn impl_method_args_no_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_method_args_no_ret.expected"));
+    eq!(buffer, include_str!("impl_method_args_no_ret.expected"));
 }
 
 #[test]
@@ -392,7 +402,7 @@ fn impl_method_args_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("impl_method_args_ret.expected"));
+    eq!(buffer, include_str!("impl_method_args_ret.expected"));
 }
 
 #[test]
@@ -406,7 +416,7 @@ fn fn_no_args_no_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_no_args_no_ret.expected"));
+    eq!(buffer, include_str!("fn_no_args_no_ret.expected"));
 }
 
 #[test]
@@ -420,7 +430,7 @@ fn fn_no_args_no_ret_public() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_no_args_no_ret_public.expected"));
+    eq!(buffer, include_str!("fn_no_args_no_ret_public.expected"));
 }
 
 #[test]
@@ -437,7 +447,7 @@ fn fn_args_no_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_args_no_ret.expected"));
+    eq!(buffer, include_str!("fn_args_no_ret.expected"));
 }
 
 #[test]
@@ -455,7 +465,7 @@ fn fn_args_ret() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_args_ret.expected"));
+    eq!(buffer, include_str!("fn_args_ret.expected"));
 }
 
 #[test]
@@ -473,7 +483,7 @@ fn fn_single_line_body() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_single_line_body.expected"));
+    eq!(buffer, include_str!("fn_single_line_body.expected"));
 }
 
 #[test]
@@ -493,7 +503,7 @@ fn fn_if_block() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_if_block.expected"));
+    eq!(buffer, include_str!("fn_if_block.expected"));
 }
 
 #[test]
@@ -517,7 +527,7 @@ fn fn_else_block() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("fn_else_block.expected"));
+    eq!(buffer, include_str!("fn_else_block.expected"));
 }
 
 #[test]
@@ -535,7 +545,7 @@ fn block_empty() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("block_empty.expected"));
+    eq!(buffer, include_str!("block_empty.expected"));
 }
 
 #[test]
@@ -570,5 +580,5 @@ fn block_structure_and_init() {
 
     let buffer = str::from_utf8(&buffer).unwrap();
 
-    assert_eq!(buffer, include_str!("block_structure_and_init.expected"));
+    eq!(buffer, include_str!("block_structure_and_init.expected"));
 }
