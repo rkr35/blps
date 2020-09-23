@@ -17,7 +17,7 @@ use std::path::Path;
 use std::ptr;
 
 // use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
-use heck::CamelCase;
+use heck::{CamelCase, SnakeCase};
 use log::info;
 use thiserror::Error;
 
@@ -68,6 +68,199 @@ pub enum Error {
     StringConversion(OsString),
 }
 
+struct Generator {
+    sdk_path: &'static Path,
+    root_mod_rs: Scope<BufWriter<File>>,
+}
+
+impl Generator {
+    fn new() -> Result<Generator, Error> {
+        let sdk_path = Path::new(r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk\");
+
+        if let Err(e) = fs::create_dir(sdk_path) {
+            if e.kind() != ErrorKind::AlreadyExists {
+                return Err(Error::Io(e));
+            }
+        }
+
+        let mut generator = Generator {
+            sdk_path,
+            root_mod_rs: Scope::new(Writer::from(create_file(sdk_path, "mod.rs")?)),
+        };
+
+        generator.add_crate_attributes()?;
+        generator.add_imports()?;
+
+        Ok(generator)
+    }
+
+    fn create_file<P: AsRef<Path>>(&self, file: P) -> Result<Scope<BufWriter<File>>, Error> {
+        Ok(Scope::new(Writer::from(create_file(self.sdk_path, file)?)))
+    }
+
+    fn create_module(&mut self, name: String) -> Result<Scope<BufWriter<File>>, Error> {
+        self.root_mod_rs.line(format_args!("mod {module};\npub use {module}::*;\n", module=name))?;
+        self.create_file(name + ".rs")
+    }
+
+    fn add_crate_attributes(&mut self) -> Result<(), Error> {
+        self.root_mod_rs.line(
+            "#![allow(bindings_with_variant_name)]\n\
+             #![allow(clippy::doc_markdown)]\n\
+             #![allow(dead_code)]\n\
+             #![allow(non_camel_case_types)]\n\
+             #![allow(non_snake_case)]\n",
+        )?;
+        Ok(())
+    }
+    
+    fn add_imports(&mut self) -> Result<(), Error> {
+        self.root_mod_rs.line(
+            "use crate::GLOBAL_OBJECTS;\n\
+             use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
+             use crate::hook::bitfield::{is_bit_set, set_bit};\n\
+             use std::mem::MaybeUninit;\n\
+             use std::ops::{Deref, DerefMut};\n",
+        )?;
+        Ok(())
+    }
+
+    unsafe fn write_object(&mut self, object: *const Object) -> Result<(), Error> {
+        if (*object).is(CONSTANT) {
+            self.write_constant(object)?;
+        } else if (*object).is(ENUMERATION) {
+            self.write_enumeration(object)?;
+        } else if (*object).is(STRUCTURE) {
+            write_structure(&mut self.root_mod_rs, object)?;
+        } else if (*object).is(CLASS) {
+            write_class(&mut self.root_mod_rs, object)?;
+        }
+        Ok(())
+    }
+
+    unsafe fn write_constant(&mut self, object: *const Object) -> Result<(), Error> {
+        let value = {
+            // Cast so we can access fields of constant.
+            let object: *const Const = object.cast();
+    
+            // Construct a printable string.
+            let value: OsString = (*object).value.to_string();
+            let mut value: String = value.into_string().map_err(Error::StringConversion)?;
+    
+            // The strings in memory are C strings, so they have null terminators that
+            // Rust strings don't care for.
+            // Get rid of that null-terminator so we don't see a funky '?' in the human-
+            // readable output.
+            if value.ends_with(char::from(0)) {
+                value.pop();
+            }
+    
+            value
+        };
+    
+        let outer = (*object)
+            .iter_outer()
+            .nth(1)
+            .ok_or(Error::ConstOuter(object))?;
+    
+        let outer = helper::get_name(outer)?;
+        let name = helper::get_name(object)?;
+        self.root_mod_rs.line(format_args!("// {}_{} = {}\n", outer, name, value))?;
+        Ok(())
+    }
+
+    unsafe fn write_enumeration(&mut self, object: *const Object) -> Result<(), Error> {
+        impl Enum {
+            pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
+                self.variants.iter().map(|n| n.name())
+            }
+        }
+    
+        let object: *const Enum = object.cast();
+    
+        let mut variant_name_counts: HashMap<&str, u8> = HashMap::new();
+        let mut common_prefix: Option<Vec<&str>> = None;
+    
+        let variants: Result<Vec<Cow<str>>, Error> = (*object)
+            .variants()
+            .map(|variant| {
+                let variant = variant.ok_or(Error::BadVariant(object))?;
+    
+                if let Some(common_prefix) = common_prefix.as_mut() {
+                    // Shrink the common prefix to the number of components still matching.
+                    let num_components_matching = common_prefix
+                        .iter()
+                        .zip(variant.split('_'))
+                        .take_while(|(cp, s)| *cp == s)
+                        .count();
+    
+                    common_prefix.truncate(num_components_matching);
+                } else {
+                    // All of the first variant will be the common prefix.
+                    common_prefix = Some(variant.split('_').collect());
+                }
+    
+                Ok(get_unique_name(&mut variant_name_counts, variant))
+            })
+            .collect();
+    
+        let variants = variants?;
+    
+        let common_prefix_len = if let Some(common_prefix) = common_prefix {
+            // Get the total number of bytes that we need to skip the common
+            // prefix for each variant name.
+            let num_underscores = common_prefix.len();
+            let len: usize = common_prefix.iter().map(|component| component.len()).sum();
+    
+            num_underscores + len
+        } else {
+            // If we haven't initialized the common prefix, then there are no
+            // variants in the enum. We don't generate empty enums.
+            return Ok(());
+        };
+    
+        let name = helper::resolve_duplicate(object.cast())?;
+        let name_snakecase = name.to_snake_case();
+
+        // Create a Rust source file for this enumeration.
+        let mut enum_file = self.create_module(name_snakecase)?;
+    
+        let mut enum_gen = enum_file
+            .line("#[repr(u8)]")?
+            .enumeration(Visibility::Public, &name)?;
+    
+        for variant in variants {
+            // Use the unstripped prefix form of the variant if the stripped form
+            // is an invalid Rust identifier.
+            let variant = variant
+                .get(common_prefix_len..)
+                .filter(|stripped| {
+                    let begins_with_number = stripped.as_bytes()[0].is_ascii_digit();
+                    let is_self = *stripped == "Self";
+    
+                    !begins_with_number && !is_self
+                })
+                .map_or(variant.as_ref(), |stripped| {
+                    // Special case: Trim "Enum name + Max" to "Max".
+                    if stripped.starts_with(name.as_ref()) && stripped.ends_with("MAX") {
+                        &stripped[name.len()..]
+                    } else {
+                        stripped
+                    }
+                })
+                .to_camel_case();
+    
+            enum_gen.variant(variant)?;
+        }
+    
+        Ok(())
+    }
+}
+
+fn create_file<P: AsRef<Path>>(sdk_path: &Path, file: P) -> Result<BufWriter<File>, Error> {
+    Ok(File::create(sdk_path.join(file)).map(BufWriter::new)?)
+}
+
 pub unsafe fn _names() -> Result<(), Error> {
     const NAMES: &str = "names.txt";
     let _time = TimeIt::new("dump global names");
@@ -110,30 +303,14 @@ pub unsafe fn _objects() -> Result<(), Error> {
 }
 
 pub unsafe fn sdk() -> Result<(), Error> {
-    let sdk_path = Path::new(r"C:\Users\Royce\Desktop\repos\blps\src\hook\sdk\");
-
-    if let Err(e) = fs::create_dir(sdk_path) {
-        if e.kind() != ErrorKind::AlreadyExists {
-            return Err(Error::Io(e))?;
-        }
-    }
-
     let _time = TimeIt::new("sdk()");
 
     find_static_classes()?;
 
-    let mut mod_rs = Scope::new(
-        Writer::from(
-            File::create(sdk_path.join("mod.rs"))
-                .map(BufWriter::new)?
-        )
-    );
-
-    add_crate_attributes(&mut mod_rs)?;
-    add_imports(&mut mod_rs)?;
+    let mut generator = Generator::new()?;
 
     for object in (*GLOBAL_OBJECTS).iter() {
-        write_object(&mut mod_rs, object)?;
+        generator.write_object(object)?;
     }
 
     Ok(())
@@ -149,159 +326,6 @@ unsafe fn find_static_classes() -> Result<(), Error> {
     STRUCTURE = helper::find("Class Core.ScriptStruct")?;
 
     property_info::find_static_classes()?;
-
-    Ok(())
-}
-
-fn add_crate_attributes(scope: &mut Scope<impl Write>) -> Result<(), Error> {
-    scope.line(
-        "#![allow(bindings_with_variant_name)]\n\
-         #![allow(clippy::doc_markdown)]\n\
-         #![allow(dead_code)]\n\
-         #![allow(non_camel_case_types)]\n\
-         #![allow(non_snake_case)]\n",
-    )?;
-
-    Ok(())
-}
-
-fn add_imports<W: Write>(scope: &mut Scope<W>) -> Result<(), Error> {
-    scope.line(
-        "use crate::GLOBAL_OBJECTS;\n\
-         use crate::game::{self, Array, FString, NameIndex, ScriptDelegate, ScriptInterface};\n\
-         use crate::hook::bitfield::{is_bit_set, set_bit};\n\
-         use std::mem::MaybeUninit;\n\
-         use std::ops::{Deref, DerefMut};\n",
-    )?;
-
-    Ok(())
-}
-
-
-unsafe fn write_object(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
-    if (*object).is(CONSTANT) {
-        // write_constant(sdk, object)?;
-    } else if (*object).is(ENUMERATION) {
-        write_enumeration(sdk, object)?;
-    } else if (*object).is(STRUCTURE) {
-        write_structure(sdk, object)?;
-    } else if (*object).is(CLASS) {
-        write_class(sdk, object)?;
-    }
-    Ok(())
-}
-
-
-unsafe fn write_constant(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
-    let value = {
-        // Cast so we can access fields of constant.
-        let object: *const Const = object.cast();
-
-        // Construct a printable string.
-        let value: OsString = (*object).value.to_string();
-        let mut value: String = value.into_string().map_err(Error::StringConversion)?;
-
-        // The strings in memory are C strings, so they have null terminators that
-        // Rust strings don't care for.
-        // Get rid of that null-terminator so we don't see a funky '?' in the human-
-        // readable output.
-        if value.ends_with(char::from(0)) {
-            value.pop();
-        }
-
-        value
-    };
-
-    let outer = (*object)
-        .iter_outer()
-        .nth(1)
-        .ok_or(Error::ConstOuter(object))?;
-
-    let outer = helper::get_name(outer)?;
-    let name = helper::get_name(object)?;
-    sdk.line(format_args!("// {}_{} = {}\n", outer, name, value))?;
-    Ok(())
-}
-
-unsafe fn write_enumeration(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
-    impl Enum {
-        pub unsafe fn variants(&self) -> impl Iterator<Item = Option<&str>> {
-            self.variants.iter().map(|n| n.name())
-        }
-    }
-
-    let object: *const Enum = object.cast();
-
-    let mut variant_name_counts: HashMap<&str, u8> = HashMap::new();
-    let mut common_prefix: Option<Vec<&str>> = None;
-
-    let variants: Result<Vec<Cow<str>>, Error> = (*object)
-        .variants()
-        .map(|variant| {
-            let variant = variant.ok_or(Error::BadVariant(object))?;
-
-            if let Some(common_prefix) = common_prefix.as_mut() {
-                // Shrink the common prefix to the number of components still matching.
-                let num_components_matching = common_prefix
-                    .iter()
-                    .zip(variant.split('_'))
-                    .take_while(|(cp, s)| *cp == s)
-                    .count();
-
-                common_prefix.truncate(num_components_matching);
-            } else {
-                // All of the first variant will be the common prefix.
-                common_prefix = Some(variant.split('_').collect());
-            }
-
-            Ok(get_unique_name(&mut variant_name_counts, variant))
-        })
-        .collect();
-
-    let variants = variants?;
-
-    let common_prefix_len = if let Some(common_prefix) = common_prefix {
-        // Get the total number of bytes that we need to skip the common
-        // prefix for each variant name.
-        let num_underscores = common_prefix.len();
-        let len: usize = common_prefix.iter().map(|component| component.len()).sum();
-
-        num_underscores + len
-    } else {
-        // If we haven't initialized the common prefix, then there are no
-        // variants in the enum. We don't generate empty enums.
-        return Ok(());
-    };
-
-    let name = helper::resolve_duplicate(object.cast())?;
-
-    let mut enum_gen = sdk
-        .line("#[repr(u8)]")?
-        .enumeration(Visibility::Public, &name)?;
-
-    for variant in variants {
-        // Use the unstripped prefix form of the variant if the stripped form
-        // is an invalid Rust identifier.
-        let variant = variant
-            .get(common_prefix_len..)
-            .filter(|stripped| {
-                let begins_with_number = stripped.as_bytes()[0].is_ascii_digit();
-                let is_self = *stripped == "Self";
-
-                !begins_with_number && !is_self
-            })
-            .map_or(variant.as_ref(), |stripped| {
-                // Special case: Trim "Enum name + Max" to "Max".
-                if stripped.starts_with(name.as_ref()) && stripped.ends_with("MAX") {
-                    &stripped[name.len()..]
-                } else {
-                    stripped
-                }
-            })
-            .to_camel_case();
-
-        enum_gen.variant(variant)?;
-    }
 
     Ok(())
 }
