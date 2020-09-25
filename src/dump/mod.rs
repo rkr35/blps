@@ -296,7 +296,7 @@ impl Generator {
             Some(super_name)
         };
     
-        let name = helper::get_name(object)?;
+        let name = helper::resolve_duplicate(object)?;
 
         let bitfields = {
 
