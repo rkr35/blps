@@ -116,6 +116,10 @@ impl Object {
         iter::successors(Some(self), |current| current.outer.as_ref())
     }
 
+    pub unsafe fn package(&self) -> Option<&Self> {
+        self.iter_outer().last()
+    }
+
     pub unsafe fn iter_class(&self) -> impl Iterator<Item = &Class> {
         iter::successors(self.class.as_ref(), |current| {
             current

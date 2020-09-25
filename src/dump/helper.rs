@@ -15,6 +15,9 @@ pub enum Error {
 
     #[error("unable to find static class for \"{0}\"")]
     StaticClassNotFound(&'static str),
+
+    #[error("unknown package for {0:?}")]
+    UnknownPackage(*const Object),
 }
 
 pub unsafe fn resolve_duplicate(object: *const Object) -> Result<Cow<'static, str>, Error> {
@@ -59,4 +62,11 @@ pub unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
         .find(class)
         .map(|o| o.cast())
         .ok_or(Error::StaticClassNotFound(class))?)
+}
+
+pub unsafe fn get_package(object: *const Object) -> Result<*const Object, Error> {
+    (*object)
+        .package()
+        .map(|package| package as *const Object)
+        .ok_or(Error::UnknownPackage(object))
 }

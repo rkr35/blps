@@ -8,6 +8,7 @@ use crate::{GLOBAL_NAMES, GLOBAL_OBJECTS};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::convert::TryFrom;
 use std::ffi::OsString;
 use std::fmt::{self, Display};
@@ -17,7 +18,7 @@ use std::path::Path;
 use std::ptr;
 
 // use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
-use heck::{CamelCase, SnakeCase};
+use heck::CamelCase;
 use log::info;
 use thiserror::Error;
 
@@ -71,6 +72,7 @@ pub enum Error {
 struct Generator {
     sdk_path: &'static Path,
     root_mod_rs: Scope<BufWriter<File>>,
+    packages: HashMap<*const Object, Scope<BufWriter<File>>>
 }
 
 impl Generator {
@@ -85,7 +87,8 @@ impl Generator {
 
         let mut generator = Generator {
             sdk_path,
-            root_mod_rs: Scope::new(Writer::from(create_file(sdk_path, "mod.rs")?)),
+            root_mod_rs: create_file(sdk_path, "mod.rs")?,
+            packages: HashMap::new(),
         };
 
         generator.add_crate_attributes()?;
@@ -94,13 +97,19 @@ impl Generator {
         Ok(generator)
     }
 
-    fn create_file<P: AsRef<Path>>(&self, file: P) -> Result<Scope<BufWriter<File>>, Error> {
-        Ok(Scope::new(Writer::from(create_file(self.sdk_path, file)?)))
-    }
-
-    fn create_module(&mut self, name: String) -> Result<Scope<BufWriter<File>>, Error> {
-        self.root_mod_rs.line(format_args!("mod {module};\npub use {module}::*;\n", module=name))?;
-        self.create_file(name + ".rs")
+    fn create_module(&mut self, package: *const Object) -> Result<&mut Scope<BufWriter<File>>, Error> {
+        let module = match self.packages.entry(package) {
+            Entry::Occupied(e) => e.into_mut(),
+            
+            Entry::Vacant(e) => {
+                let name = unsafe { helper::get_name(package)? };
+                self.root_mod_rs.line(format_args!("mod {module};\npub use {module}::*;\n", module=name))?;
+                let file = create_file(self.sdk_path, name.to_owned() + ".rs")?;
+                e.insert(file)
+            }
+        };
+        
+        Ok(module)
     }
 
     fn add_crate_attributes(&mut self) -> Result<(), Error> {
@@ -131,9 +140,9 @@ impl Generator {
         } else if (*object).is(ENUMERATION) {
             self.write_enumeration(object)?;
         } else if (*object).is(STRUCTURE) {
-            write_structure(&mut self.root_mod_rs, object)?;
+            self.write_structure(object)?;
         } else if (*object).is(CLASS) {
-            write_class(&mut self.root_mod_rs, object)?;
+            self.write_class(object)?;
         }
         Ok(())
     }
@@ -165,7 +174,9 @@ impl Generator {
     
         let outer = helper::get_name(outer)?;
         let name = helper::get_name(object)?;
-        self.root_mod_rs.line(format_args!("// {}_{} = {}\n", outer, name, value))?;
+        let package = helper::get_package(object)?;
+
+        self.create_module(package)?.line(format_args!("// {}_{} = {}\n", outer, name, value))?;
         Ok(())
     }
 
@@ -220,12 +231,11 @@ impl Generator {
         };
     
         let name = helper::resolve_duplicate(object.cast())?;
-        let name_snakecase = name.to_snake_case();
-
-        // Create a Rust source file for this enumeration.
-        let mut enum_file = self.create_module(name_snakecase)?;
+        let package = helper::get_package(object.cast())?;
+        
+        let package_file = self.create_module(package)?;
     
-        let mut enum_gen = enum_file
+        let mut enum_gen = package_file
             .line("#[repr(u8)]")?
             .enumeration(Visibility::Public, &name)?;
     
@@ -255,10 +265,81 @@ impl Generator {
     
         Ok(())
     }
+
+    unsafe fn write_structure(&mut self, object: *const Object) -> Result<&mut Scope<impl Write>, Error> {
+        let package = helper::get_package(object)?;
+        let mut sdk = self.create_module(package)?;
+
+        sdk.line("use super::*;\n")?;
+    
+        let structure: *const Struct = object.cast();
+    
+        let mut offset: u32 = 0;
+    
+        let super_class: *const Struct = (*structure).super_field.cast();
+    
+        let structure_size = (*structure).property_size.into();
+        let full_name = helper::get_full_name(object)?;
+    
+        let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
+            sdk.line(format_args!("// {}, {:#x}", full_name, structure_size))?;
+            None
+        } else {
+            offset = (*super_class).property_size.into();
+            let relative_size = structure_size - offset;
+            let super_name = helper::get_name(super_class.cast())?;
+            sdk.line(format_args!(
+                "// {}, {:#x} ({:#x} - {:#x})",
+                full_name, relative_size, structure_size, offset
+            ))?;
+    
+            Some(super_name)
+        };
+    
+        let name = helper::get_name(object)?;
+
+        let bitfields = {
+
+            let mut struct_gen = sdk
+                .line("#[repr(C)]")?
+                .structure(Visibility::Public, &name)?;
+    
+            if let Some(super_class) = super_class {
+                emit_field(&mut struct_gen, "base", super_class, 0, offset)?;
+            }
+    
+            let properties = get_fields(structure, offset);
+            let bitfields = add_fields(&mut struct_gen, &mut offset, properties)?;
+    
+            if offset < structure_size {
+                add_padding(&mut struct_gen, offset, structure_size - offset)?;
+            }
+    
+            bitfields
+        };
+    
+        bitfields.emit(&mut sdk, &name)?;
+    
+        if let Some(super_class) = super_class {
+            add_deref_impls(&mut sdk, &name, super_class)?;
+        } else if name == "Object" {
+            add_object_deref_impl(&mut sdk)?;
+        }
+    
+        Ok(sdk)
+    }
+
+    unsafe fn write_class(&mut self, object: *const Object) -> Result<(), Error> {
+        let mut sdk = self.write_structure(object)?;
+        add_methods(&mut sdk, object.cast())?;
+        Ok(())
+    }
 }
 
-fn create_file<P: AsRef<Path>>(sdk_path: &Path, file: P) -> Result<BufWriter<File>, Error> {
-    Ok(File::create(sdk_path.join(file)).map(BufWriter::new)?)
+fn create_file<P: AsRef<Path>>(sdk_path: &Path, file: P) -> Result<Scope<BufWriter<File>>, Error> {
+    let full_file_path = sdk_path.join(file);
+    let file = File::create(full_file_path).map(BufWriter::new)?;
+    Ok(Scope::new(Writer::from(file)))
 }
 
 pub unsafe fn _names() -> Result<(), Error> {
@@ -338,63 +419,6 @@ fn get_unique_name<'a>(name_counts: &mut HashMap<&'a str, u8>, name: &'a str) ->
     } else {
         Cow::Owned(format!("{}_{}", name, count))
     }
-}
-
-unsafe fn write_structure(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
-    let name = helper::resolve_duplicate(object)?;
-
-    let structure: *const Struct = object.cast();
-
-    let mut offset: u32 = 0;
-
-    let super_class: *const Struct = (*structure).super_field.cast();
-
-    let structure_size = (*structure).property_size.into();
-    let full_name = helper::get_full_name(object)?;
-
-    let super_class = if super_class.is_null() || ptr::eq(super_class, structure) {
-        sdk.line(format_args!("// {}, {:#x}", full_name, structure_size))?;
-        None
-    } else {
-        offset = (*super_class).property_size.into();
-        let relative_size = structure_size - offset;
-        let super_name = helper::get_name(super_class.cast())?;
-        sdk.line(format_args!(
-            "// {}, {:#x} ({:#x} - {:#x})",
-            full_name, relative_size, structure_size, offset
-        ))?;
-
-        Some(super_name)
-    };
-
-    let bitfields = {
-        let mut struct_gen = sdk
-            .line("#[repr(C)]")?
-            .structure(Visibility::Public, &name)?;
-
-        if let Some(super_class) = super_class {
-            emit_field(&mut struct_gen, "base", super_class, 0, offset)?;
-        }
-
-        let properties = get_fields(structure, offset);
-        let bitfields = add_fields(&mut struct_gen, &mut offset, properties)?;
-
-        if offset < structure_size {
-            add_padding(&mut struct_gen, offset, structure_size - offset)?;
-        }
-
-        bitfields
-    };
-
-    bitfields.emit(sdk, &name)?;
-
-    if let Some(super_class) = super_class {
-        add_deref_impls(sdk, &name, super_class)?;
-    } else if name == "Object" {
-        add_object_deref_impl(sdk)?;
-    }
-
-    Ok(())
 }
 
 unsafe fn get_fields(structure: *const Struct, offset: u32) -> Vec<&'static Property> {
@@ -543,13 +567,6 @@ fn add_object_deref_impl(sdk: &mut Scope<impl Write>) -> Result<(), Error> {
         .function_args_ret("", "deref_mut", args!("&mut self"), "&mut Self::Target")?
         .line("unsafe { &mut *(self as *mut Self as *mut Self::Target) }")?;
 
-    Ok(())
-}
-
-
-unsafe fn write_class(sdk: &mut Scope<impl Write>, object: *const Object) -> Result<(), Error> {
-    write_structure(sdk, object)?;
-    add_methods(sdk, object.cast())?;
     Ok(())
 }
 
