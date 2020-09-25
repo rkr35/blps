@@ -105,8 +105,14 @@ impl Generator {
                 let name = unsafe { helper::get_name(package)? };
                 let mut name = name.to_snake_case();
 
-                self.root_mod_rs.line(format_args!("mod {module};\npub use {module}::*;\n", module=name))?;
-                
+                self.root_mod_rs.line(format_args!("mod {};", name))?;
+
+                if name == "core" {
+                    self.root_mod_rs.line(format_args!("pub use self::{}::*;\n", name))?;
+                } else {
+                    self.root_mod_rs.line(format_args!("pub use {}::*;\n", name))?;
+                }
+
                 name += ".rs";
 
                 let mut file = create_file(self.sdk_path, name)?;
