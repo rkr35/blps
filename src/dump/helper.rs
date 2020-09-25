@@ -31,7 +31,7 @@ pub unsafe fn resolve_duplicate(object: *const Object) -> Result<Cow<'static, st
 
     let name = get_name(object)?;
 
-    if DUPLICATES.iter().any(|dup| name == *dup) {
+    if DUPLICATES.contains(&name) {
         let mut module = None;
         let mut submodule = None;
 
