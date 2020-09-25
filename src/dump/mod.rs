@@ -18,7 +18,7 @@ use std::path::Path;
 use std::ptr;
 
 // use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
-use heck::CamelCase;
+use heck::{CamelCase, SnakeCase};
 use log::info;
 use thiserror::Error;
 
@@ -103,8 +103,15 @@ impl Generator {
             
             Entry::Vacant(e) => {
                 let name = unsafe { helper::get_name(package)? };
+                let mut name = name.to_snake_case();
+
                 self.root_mod_rs.line(format_args!("mod {module};\npub use {module}::*;\n", module=name))?;
-                let file = create_file(self.sdk_path, name.to_owned() + ".rs")?;
+                
+                name += ".rs";
+
+                let mut file = create_file(self.sdk_path, name)?;
+                file.line("use super::*;\n")?;
+                
                 e.insert(file)
             }
         };
@@ -269,8 +276,6 @@ impl Generator {
     unsafe fn write_structure(&mut self, object: *const Object) -> Result<&mut Scope<impl Write>, Error> {
         let package = helper::get_package(object)?;
         let mut sdk = self.create_module(package)?;
-
-        sdk.line("use super::*;\n")?;
     
         let structure: *const Struct = object.cast();
     
