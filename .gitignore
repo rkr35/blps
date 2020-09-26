@@ -1,5 +1,5 @@
 /target
 Cargo.lock
 .vs
-src/hook/sdk.rs
+src/hook/sdk
 sample_events.txt
