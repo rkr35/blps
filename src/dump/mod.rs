@@ -127,11 +127,17 @@ impl Generator {
 
     fn add_crate_attributes(&mut self) -> Result<(), Error> {
         self.root_mod_rs.line(
-            "#![allow(bindings_with_variant_name)]\n\
-             #![allow(clippy::doc_markdown)]\n\
-             #![allow(dead_code)]\n\
-             #![allow(non_camel_case_types)]\n\
-             #![allow(non_snake_case)]\n",
+           "#![allow(bindings_with_variant_name)]\n\
+            #![allow(clippy::doc_markdown)]\n\
+            #![allow(clippy::fn_params_excessive_bools)]\n\
+            #![allow(clippy::module_name_repetitions)]\n\
+            #![allow(clippy::too_many_arguments)]\n\
+            #![allow(clippy::type_complexity)]\n\
+            #![allow(clippy::used_underscore_binding)]\n\
+            #![allow(clippy::wildcard_imports)]\n\
+            #![allow(dead_code)]\n\
+            #![allow(non_camel_case_types)]\n\
+            #![allow(non_snake_case)]\n"
         )?;
         Ok(())
     }
