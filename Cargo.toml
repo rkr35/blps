@@ -15,12 +15,10 @@ lto = "fat"
 panic = "abort"
 
 [features]
-dump = ["codegen", "genial", "heck"]
-genial = []
+dump = ["heck"]
 hook = ["detours-sys"]
 
 [dependencies]
-codegen = { version = "0.1.3", optional = true }
 detours-sys = { git = "https://github.com/rkr35/detours", optional = true }
 heck = { version = "0.3", optional = true }
 log = "0.4"

@@ -1,4 +1,3 @@
-#[cfg(feature = "genial")]
 use crate::args;
 
 use crate::game::{cast, BoolProperty, Class, Const, Enum, Function, Object, Property, Struct};
@@ -17,7 +16,6 @@ use std::io::{self, BufWriter, ErrorKind, Write};
 use std::path::Path;
 use std::ptr;
 
-// use codegen::{Block, Field, Impl, Scope, Struct as StructGen, Type};
 use heck::{CamelCase, SnakeCase};
 use log::info;
 use thiserror::Error;
@@ -25,10 +23,7 @@ use thiserror::Error;
 mod bitfield;
 use bitfield::{Bitfields, PostAddInstruction};
 
-#[cfg(feature = "genial")]
 mod genial;
-
-#[cfg(feature = "genial")]
 use genial::{Arg, BlockSuffix, Gen, GenFunction, Impl, Nil, Scope, Structure, Visibility, Writer, WriterWrapper};
 
 mod helper;
