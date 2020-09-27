@@ -20,6 +20,7 @@ hook = ["detours-sys"]
 
 [dependencies]
 detours-sys = { git = "https://github.com/rkr35/detours", optional = true }
+heapless = { version = "0.5.6", optional = true }
 heck = { version = "0.3", optional = true }
 log = "0.4"
 simplelog = "0.8"

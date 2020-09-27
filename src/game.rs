@@ -9,6 +9,11 @@ use std::os::windows::ffi::OsStringExt;
 use std::ptr;
 use std::slice;
 
+use heapless::{String, Vec};
+use heapless::consts::{U32, U512};
+
+pub type FullName = String<U512>;
+
 pub type Objects = Array<*mut Object>;
 pub type Names = Array<*const Name>;
 
@@ -97,19 +102,33 @@ pub struct Object {
 }
 
 impl Object {
-    pub unsafe fn full_name(&self) -> Option<String> {
+    pub unsafe fn full_name(&self) -> Option<FullName> {
+        //  Todo: Result<FullName, Error>
         if self.class.is_null() {
             return None;
         }
 
-        let outer_names: Option<Vec<_>> = self.iter_outer().map(|o| o.name()).collect();
-        let mut outer_names = outer_names?;
-        outer_names.reverse();
-        let name = outer_names.join(".");
+        let mut outer_names: Vec<&str, U32> = Vec::new();
 
-        let class = String::from((*self.class).field.object.name()?);
+        for outer_name in self.iter_outer().map(|o| o.name()) {
+            outer_names.push(outer_name?).ok()?;
+        }
 
-        Some(class + " " + &name)
+        let mut full_name: FullName = (*self.class).field.object.name()?.into();
+        full_name.push(' ').ok()?;
+
+        {
+            let (last, rest) = outer_names.split_first()?;
+
+            for outer_name in rest.iter().rev() {
+                full_name.push_str(outer_name).ok()?;
+                full_name.push('.').ok()?;
+            }
+
+            full_name.push_str(last).ok()?;
+        }
+
+        Some(full_name)
     }
 
     pub unsafe fn iter_outer(&self) -> impl Iterator<Item = &Self> {

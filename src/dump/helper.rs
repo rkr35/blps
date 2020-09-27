@@ -1,4 +1,4 @@
-use crate::game::{Class, Object};
+use crate::game::{Class, Object, FullName};
 use crate::GLOBAL_OBJECTS;
 
 use std::borrow::Cow;
@@ -53,7 +53,7 @@ pub unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
     Ok((*object).name().ok_or(Error::NullName(object))?)
 }
 
-pub unsafe fn get_full_name(object: *const Object) -> Result<String, Error> {
+pub unsafe fn get_full_name(object: *const Object) -> Result<FullName, Error> {
     Ok((*object).full_name().ok_or(Error::NullName(object))?)
 }
 
