@@ -11,8 +11,14 @@ use std::slice;
 
 use heapless::{String, Vec};
 use heapless::consts::{U32, U512};
+use thiserror::Error;
+use typenum::marker_traits::Unsigned;
 
-pub type FullName = String<U512>;
+type FullNameCapacity = U512;
+pub type FullName = String<FullNameCapacity>;
+
+type OuterNamesCapacity = U32;
+type OuterNamesVec<'a> = Vec<&'a str, OuterNamesCapacity>;
 
 pub type Objects = Array<*mut Object>;
 pub type Names = Array<*const Name>;
@@ -101,34 +107,73 @@ pub struct Object {
     pub archetype: *mut Object,
 }
 
-impl Object {
-    pub unsafe fn full_name(&self) -> Option<FullName> {
-        //  Todo: Result<FullName, Error>
-        if self.class.is_null() {
-            return None;
-        }
+#[derive(Error, Debug)]
+pub enum FullNameError {
+    #[error("the full name String exceeded its capacity of {} bytes", FullNameCapacity::to_u32())]
+    FullNameCapacity,
 
-        let mut outer_names: Vec<&str, U32> = Vec::new();
+    #[error("no outer names")]
+    NoOuterNames,
+
+    #[error("class is null")]
+    NullClass,
+
+    #[error("class name is null")]
+    NullClassName,
+
+    #[error("one of the outer classes has a null name")]
+    NullOuterName,
+
+    #[error("the outer names Vec exceeded its capacity of {} elements", OuterNamesCapacity::to_u32())]
+    OuterNamesCapacity,
+}
+
+impl Object {
+    pub unsafe fn full_name(&self) -> Result<FullName, FullNameError> {
+        let mut outer_names: OuterNamesVec = OuterNamesVec::new();
 
         for outer_name in self.iter_outer().map(|o| o.name()) {
-            outer_names.push(outer_name?).ok()?;
+            outer_names
+                .push(outer_name.ok_or(FullNameError::NullOuterName)?)
+                .map_err(|_| FullNameError::OuterNamesCapacity)?
         }
 
-        let mut full_name: FullName = (*self.class).field.object.name()?.into();
-        full_name.push(' ').ok()?;
+        let class_name = self.class
+            .as_ref()
+            .ok_or(FullNameError::NullClass)?
+            .name()
+            .ok_or(FullNameError::NullClassName)?;
 
-        {
-            let (last, rest) = outer_names.split_first()?;
+        let mut full_name: FullName = class_name.into();
 
-            for outer_name in rest.iter().rev() {
-                full_name.push_str(outer_name).ok()?;
-                full_name.push('.').ok()?;
-            }
+        macro_rules! push {
+            ($character:literal) => {
+                full_name
+                    .push($character)
+                    .map_err(|_| FullNameError::FullNameCapacity)?;
+            };
 
-            full_name.push_str(last).ok()?;
+            ($s:expr) => {
+                full_name
+                    .push_str($s)
+                    .map_err(|_| FullNameError::FullNameCapacity)?;
+            };
+        }
+        
+        push!(' ');
+
+        let (last, rest) = outer_names
+            .split_first()
+            .ok_or(FullNameError::NoOuterNames)?;
+
+        for outer_name in rest.iter().rev() {
+            push!(outer_name);
+            push!('.');
         }
 
-        Some(full_name)
+        push!(last);
+
+        Ok(full_name)
     }
 
     pub unsafe fn iter_outer(&self) -> impl Iterator<Item = &Self> {

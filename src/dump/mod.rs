@@ -17,7 +17,7 @@ use std::path::Path;
 use std::ptr;
 
 use heck::{CamelCase, SnakeCase};
-use log::info;
+use log::{error, info};
 use thiserror::Error;
 
 mod bitfield;
@@ -387,8 +387,9 @@ pub unsafe fn _objects() -> Result<(), Error> {
         let address = object as usize;
         let object = &*object;
 
-        if let Some(name) = object.full_name() {
-            writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?;
+        match object.full_name() {
+            Ok(name) => writeln!(&mut dump, "[{}] {} {:#x}", object.index, name, address)?,
+            Err(e) => error!("dump globals error: {}", e),
         }
     }
 

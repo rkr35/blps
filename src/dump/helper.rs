@@ -1,4 +1,4 @@
-use crate::game::{Class, Object, FullName};
+use crate::game::{Class, Object, FullName, FullNameError};
 use crate::GLOBAL_OBJECTS;
 
 use std::borrow::Cow;
@@ -7,6 +7,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("full name error: {0}")]
+    FullName(#[from] FullNameError),
+
     #[error("cannot find module and submodule for {0:?}")]
     ModuleSubmodule(*const Object),
 
@@ -54,7 +57,7 @@ pub unsafe fn get_name(object: *const Object) -> Result<&'static str, Error> {
 }
 
 pub unsafe fn get_full_name(object: *const Object) -> Result<FullName, Error> {
-    Ok((*object).full_name().ok_or(Error::NullName(object))?)
+    Ok((*object).full_name()?)
 }
 
 pub unsafe fn find(class: &'static str) -> Result<*const Class, Error> {
