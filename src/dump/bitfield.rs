@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::{self, Display, Formatter};
 use std::io::{self, Write};
 
 use super::genial::{Gen, GenFunction, Impl, Scope, WriterWrapper};
@@ -27,7 +28,7 @@ impl Bitfield {
         self.fields.push(field);
     }
 
-    pub fn emit(self, imp: &mut Impl<impl Write>, name: &str) -> Result<(), io::Error> {
+    pub fn emit(self, imp: &mut Impl<impl Write>, name: impl Display) -> Result<(), io::Error> {
         let mut counts: HashMap<Cow<str>, usize> = HashMap::new();
 
         let mut get_count = |s| *counts.entry(s).and_modify(|c| *c += 1).or_default();
@@ -125,15 +126,29 @@ impl Bitfields {
         let mut imp = sdk.imp(structure)?;
 
         for (i, bitfield) in self.bitfields.into_iter().enumerate() {
-            let name: Cow<str> = if i > 0 {
-                format!("{}_{}", FIELD, i).into()
-            } else {
-                FIELD.into()
+            let name = Identifier {
+                name: FIELD,
+                id: i,
             };
 
-            bitfield.emit(&mut imp, &name)?;
+            bitfield.emit(&mut imp, name)?;
         }
 
         Ok(())
+    }
+}
+
+struct Identifier<N: Display, I: PartialOrd + Display + Default> {
+    name: N,
+    id: I,
+}
+
+impl<N: Display, I: PartialOrd + Display + Default> Display for Identifier<N, I> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        if self.id > I::default() {
+            write!(f, "{}_{}", self.name, self.id)
+        } else {
+            write!(f, "{}", self.name)
+        }
     }
 }
