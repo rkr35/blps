@@ -57,8 +57,8 @@ pub enum Error {
     #[error("property info error: {0}")]
     PropertyInfo(#[from] property_info::Error),
 
-    #[error("property size mismatch of {1} bytes for {0:?}; info = {2:?}")]
-    PropertySizeMismatch(*const Property, i64, PropertyInfo),
+    #[error("property size mismatch of {} bytes for {:?}; info = {:?}", 0.1, 0.0, 0.2)]
+    PropertySizeMismatch(Box<(*const Property, i64, PropertyInfo)>), // https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant
 
     #[error("failed to convert OsString \"{0:?}\" to String")]
     StringConversion(OsString),
@@ -481,7 +481,7 @@ unsafe fn add_fields(
             i64::from(total_property_size) - i64::from(info.size * property.array_dim);
 
         if size_mismatch != 0 {
-            return Err(Error::PropertySizeMismatch(property, size_mismatch, info));
+            return Err(Error::PropertySizeMismatch(Box::new((property, size_mismatch, info))));
         }
 
         let mut name = helper::get_name(property as &Object)?;
@@ -501,16 +501,16 @@ unsafe fn add_fields(
             get_unique_name(&mut field_name_counts, scrub_reserved_name(name))
         );
 
-        let mut field_type = info.into_typed_comment();
-
-        if property.array_dim > 1 {
-            field_type = format!("[{}; {}]", field_type, property.array_dim).into();
-        }
+        let field_type = if property.array_dim > 1 {
+            info.into_type()?
+        } else {
+            info.into_array_type(property.array_dim)?
+        };
 
         emit_field(
             struct_gen,
             &field_name,
-            field_type.as_ref(),
+            field_type,
             property.offset,
             total_property_size,
         )?;
@@ -613,17 +613,17 @@ struct Parameter<'a> {
     property: &'a Property,
     kind: ParameterKind,
     name: Cow<'a, str>,
-    typ: Cow<'a, str>,
+    typ: property_info::String,
 }
 
-impl<'a> From<Parameter<'a>> for Arg<Cow<'a, str>, Cow<'a, str>> {
+impl<'a> From<Parameter<'a>> for Arg<Cow<'a, str>, property_info::String> {
     fn from(p: Parameter<'a>) -> Self {
         Self::NameType(p.name, p.typ)
     }
 }
 
-impl<'a> From<&'a Parameter<'a>> for Arg<&'a Cow<'a, str>, &'a Cow<'a, str>> {
-    fn from(p: &'a Parameter<'a>) -> Arg<&'a Cow<'a, str>, &'a Cow<'a, str>> {
+impl<'a> From<&'a Parameter<'a>> for Arg<&'a Cow<'a, str>, &'a property_info::String> {
+    fn from(p: &'a Parameter<'a>) -> Arg<&'a Cow<'a, str>, &'a property_info::String> {
         Self::NameType(&p.name, &p.typ)
     }
 }
@@ -654,9 +654,9 @@ impl<'a> TryFrom<&'a Function> for Parameters<'a> {
                 let name = helper::get_name(parameter as &Object)?;
                 let name = scrub_reserved_name(name);
                 let name = get_unique_name(&mut parameter_name_counts, name);
-                let mut typ = PropertyInfo::try_from(parameter)?.into_typed_comment();
+                let mut typ = PropertyInfo::try_from(parameter)?.into_type()?;
 
-                if typ == "u32" {
+                if typ.as_str() == "u32" {
                     // Special case: Apparently `BoolProperty` is "u32" in
                     // structure/class definitions, but "bool" when in method
                     // parameters.

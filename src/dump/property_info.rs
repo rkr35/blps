@@ -4,12 +4,30 @@ use crate::game::{
     NameIndex, ObjectProperty, Property, ScriptDelegate, ScriptInterface, StructProperty,
 };
 
-use std::borrow::Cow;
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::mem;
 use std::ptr;
 
+use heapless::String as StringT;
+use heapless::consts::U128;
 use thiserror::Error;
+use typenum::Unsigned;
+
+type StringCapacity = U128;
+
+pub type String = StringT<StringCapacity>;
+
+macro_rules! format {
+    ($($arg:tt)*) => {{
+        let mut s = String::new();
+        if write!(&mut s, $($arg)*).is_ok() {
+            Ok(s)
+        } else {
+            Err(Error::StringCapacity)
+        }
+    }}
+}
 
 static mut ARRAY_PROPERTY: *const Class = ptr::null();
 pub static mut BOOL_PROPERTY: *const Class = ptr::null();
@@ -50,6 +68,9 @@ pub enum Error {
     #[error("null property struct for {0:?}")]
     NullPropertyStruct(*const StructProperty),
 
+    #[error("string exceeded its capacity of {} bytes", StringCapacity::to_u32())]
+    StringCapacity,
+
     #[error("unknown property type for {0:?}")]
     UnknownProperty(*const Property),
 }
@@ -75,25 +96,29 @@ pub unsafe fn find_static_classes() -> Result<(), Error> {
 #[derive(Debug)]
 pub struct PropertyInfo {
     pub size: u32,
-    pub field_type: Cow<'static, str>,
-    pub comment: Cow<'static, str>,
+    pub field_type: String,
+    pub comment: String,
 }
 
 impl PropertyInfo {
-    fn new(size: u32, field_type: Cow<'static, str>) -> Self {
+    fn new(size: u32, field_type: String) -> Self {
         Self {
             size,
             field_type,
-            comment: "".into(),
+            comment: String::default(),
         }
     }
 
-    pub fn into_typed_comment(self) -> Cow<'static, str> {
+    pub fn into_type(self) -> Result<String, Error> {
         if self.comment.is_empty() {
-            self.field_type
+            Ok(self.field_type)
         } else {
-            Cow::Owned(format!("{} /* {} */", self.field_type, self.comment))
+            format!("{} /* {} */", self.field_type, self.comment)
         }
+    }
+
+    pub fn into_array_type(self, dimensions: u32) -> Result<String, Error> {
+        format!("[{}; {}]", self.into_type()?, dimensions)
     }
 }
 
@@ -118,8 +143,8 @@ impl TryFrom<&Property> for PropertyInfo {
 
                 if let Some(inner) = property.inner.as_ref() {
                     let inner = PropertyInfo::try_from(inner)?;
-                    let typ = format!("Array<{}>", inner.field_type);
-                    let mut info = Self::new(size_of::<Array<usize>>(), typ.into());
+                    let typ = format!("Array<{}>", inner.field_type)?;
+                    let mut info = Self::new(size_of::<Array<usize>>(), typ);
                     info.comment = inner.comment;
                     info
                 } else {
@@ -134,7 +159,7 @@ impl TryFrom<&Property> for PropertyInfo {
                 if property.enumeration.is_null() {
                     simple!(u8)
                 } else {
-                    let typ = helper::resolve_duplicate(property.enumeration.cast())?;
+                    let typ = format!("{}", helper::resolve_duplicate(property.enumeration.cast())?)?;
                     Self::new(size_of::<u8>(), typ)
                 }
             } else if property.is(CLASS_PROPERTY) {
@@ -145,9 +170,8 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let name = helper::get_name(property.meta_class.cast())?;
-                let typ = format!("*mut {}", name);
-
-                Self::new(size_of::<usize>(), typ.into())
+                let typ = format!("*mut {}", name)?;
+                Self::new(size_of::<usize>(), typ)
             } else if property.is(DELEGATE_PROPERTY) {
                 simple!(ScriptDelegate)
             } else if property.is(FLOAT_PROPERTY) {
@@ -162,13 +186,14 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let mut info = simple!(ScriptInterface);
-                info.comment = helper::get_name(property.class.cast())?.into();
+                info.comment.push_str(helper::get_name(property.class.cast())?).map_err(|_| Error::StringCapacity)?;
                 info
             } else if property.is(MAP_PROPERTY) {
                 const MAP_SIZE_BYTES: u32 = 60;
-                let typ = format!("[u8; {}]", MAP_SIZE_BYTES);
-                let mut info = Self::new(MAP_SIZE_BYTES, typ.into());
-                info.comment = "Map".into();
+                
+                let typ = format!("[u8; {}]", MAP_SIZE_BYTES)?;
+                let mut info = Self::new(MAP_SIZE_BYTES, typ);
+                info.comment.push_str("Map").map_err(|_| Error::StringCapacity)?;
                 info
             } else if property.is(NAME_PROPERTY) {
                 simple!(NameIndex)
@@ -180,9 +205,8 @@ impl TryFrom<&Property> for PropertyInfo {
                 }
 
                 let name = helper::get_name(property.class.cast())?;
-                let typ = format!("*mut {}", name);
-
-                Self::new(size_of::<usize>(), typ.into())
+                let typ = format!("*mut {}", name)?;
+                Self::new(size_of::<usize>(), typ)
             } else if property.is(STR_PROPERTY) {
                 simple!(FString)
             } else if property.is(STRUCT_PROPERTY) {
@@ -192,7 +216,7 @@ impl TryFrom<&Property> for PropertyInfo {
                     return Err(Error::NullPropertyStruct(property));
                 }
 
-                let typ = helper::resolve_duplicate(property.inner_struct.cast())?;
+                let typ = format!("{}", helper::resolve_duplicate(property.inner_struct.cast())?)?;
                 Self::new(property.element_size, typ)
             } else {
                 return Err(Error::UnknownProperty(property));
