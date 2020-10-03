@@ -133,7 +133,7 @@ impl TryFrom<&Property> for PropertyInfo {
 
         macro_rules! simple {
             ($typ:ty) => {
-                Self::new(size_of::<$typ>(), stringify!($typ).into())
+                Self::new(size_of::<$typ>(), stringify!($typ).parse().map_err(|_| Error::StringCapacity)?)
             };
         }
 
